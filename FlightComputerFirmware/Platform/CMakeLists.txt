@@ -1,0 +1,6 @@
+file(GLOB_RECURSE PLATFORM_SOURCES "./*.c")
+add_library(Platform STATIC ${PLATFORM_SOURCES})
+target_include_directories(Platform PUBLIC "${CMAKE_CURRENT_LIST_DIR}/")
+target_link_libraries(Platform Cmsis)
+target_link_libraries(Platform HalF3)
+target_link_libraries(Platform FreeRTOS)
