@@ -15,12 +15,13 @@ static TIM_HandleTypeDef tim4_handle;
 
 #define TIM_4_PRESCALER   22
 #define TIM_4_PERIOD      65445
-#define TIM_4_MS_TO_TICKS(x) (x * 3272.25)
+#define TIM_4_MS_TO_TICKS(x) (uint16_t)(x * 3272.25)
 
 void ServoOut_Init(void)
 {
   TIM_OC_InitTypeDef sConfig;
   GPIO_InitTypeDef GPIO_InitStruct;
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
 
   __HAL_RCC_TIM3_CLK_ENABLE();
   __HAL_RCC_TIM4_CLK_ENABLE();
@@ -66,13 +67,16 @@ void ServoOut_Init(void)
   // PA6 : TIM3_CH1 : OUT1
   // PA7 : TIM3_CH2 : OUT2
   tim3_handle.Instance = TIM3;
-  tim3_handle.Init.Prescaler         = TIM_3_PRESCALER -1;
+  tim3_handle.Init.Prescaler         = TIM_3_PRESCALER - 1;
   tim3_handle.Init.Period            = TIM_3_PERIOD - 1;
   tim3_handle.Init.ClockDivision     = 0;
   tim3_handle.Init.CounterMode       = TIM_COUNTERMODE_UP;
   tim3_handle.Init.RepetitionCounter = 0;
   tim3_handle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   HAL_TIM_PWM_Init(&tim3_handle);
+  
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  HAL_TIM_ConfigClockSource(&tim3_handle, &sClockSourceConfig);
 
   // OUT1
   sConfig.OCMode       = TIM_OCMODE_PWM1;
@@ -160,7 +164,7 @@ void ServoOut_Set(const enum SERVOOUT_CHANNEL channel, const float value)
 
     case SERVOOUT_CHANNEL_2:
       HAL_TIM_PWM_Start(&tim3_handle, TIM_CHANNEL_2);
-      __HAL_TIM_SET_COMPARE(&tim3_handle, TIM_CHANNEL_2, TIM_3_MS_TO_TICKS(value));;
+      __HAL_TIM_SET_COMPARE(&tim3_handle, TIM_CHANNEL_2, TIM_3_MS_TO_TICKS(value));
       break;
 
     case SERVOOUT_CHANNEL_3:

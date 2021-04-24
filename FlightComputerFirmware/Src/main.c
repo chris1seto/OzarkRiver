@@ -22,6 +22,8 @@ int main(void)
   HAL_Init();
   SystemClock_Config();
   HAL_InitTick(0);
+  __HAL_RCC_SYSCFG_CLK_ENABLE();
+  __HAL_RCC_PWR_CLK_ENABLE();
   Retarget_Init();
   printf("%cUp!\r\n", 12);
   
@@ -31,11 +33,13 @@ int main(void)
   
   // Init Spektrum
   SpectrumRcIn_Init();
-  
+
   // Init servos
   ServoOut_Init();
-  ServoOut_Set(SERVOOUT_CHANNEL_1, 1400);
-  ServoOut_Set(SERVOOUT_CHANNEL_2, 1200);
+  ServoOut_Set(SERVOOUT_CHANNEL_1, 1.500);
+  ServoOut_Set(SERVOOUT_CHANNEL_2, 1.600);
+  ServoOut_Set(SERVOOUT_CHANNEL_3, 1.500);
+  ServoOut_Set(SERVOOUT_CHANNEL_4, 1.600);
   
   // Start main task
   xTaskCreate(MainTask, "MAIN", 1024, NULL, 0, NULL);
@@ -55,6 +59,8 @@ static void MainTask(void* args)
   {
     Leds_Toggle(LED_BLUE | LED_RED, led_state);
     led_state = !led_state;
+    
+    //printf("%li\r\n", TIM3->CNT);
     
     vTaskDelay(100);
   }

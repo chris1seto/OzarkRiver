@@ -1,20 +1,7 @@
-MPU6050
-
-PPM in
-
-Spektrum
-
-Other
-#define LED0_PIN                PB3
-#define LED1_PIN                PB4
-#define BEEPER_PIN              PA12
-#define MAG_INT_EXTI            PC14
-#define GYRO_1_EXTI_PIN         PC13
-#define NAZE_SPI_INSTANCE       SPI2
-#define NAZE_SPI_CS_PIN         PB12
-
 
 ** Confirmed:
+PPM PA0
+
 USART1_TX PA9
 USART1_RX PA10
 USART3_RX PB11 Spektrum
@@ -26,3 +13,47 @@ OUT3 PA11 TIM4_CH1
 OUT4 PA12 TIM4_CH2
 OUT5 PB8  TIM4_CH3
 OUT6 PB9  TIM4_CH4
+
+SPI2
+- PB15 MOSI
+- PB14 MISO
+- PB13 SCK
+* Winbond 
+
+I2C1
+* MS5611
+* MPU6050
+PB6 SCL
+PB7 SDA
+
+Winbond 25Q64
+1 CS   PB12 
+2 DO   PB14
+3 !WP pulled up to vcc
+4 GND
+5 DI   PB15
+6 CLK  PB13
+7 !hold/reset pulled up to vcc
+8 Vcc
+
+MS5611
+1 3v3
+2 PS 3v3 (i2c mode)
+3 GND
+4 CSB GND
+5 CSB GND
+6 SDO NC...?
+7 SDA PB7
+8 CLK PB6
+
+MPU6050
+INT   PC13
+FSYNC GND
+
+HMC5883L
+DRDY PC14
+
+Header:
+LED: PA8
+Batt PA4 top/bottom res:  10.46K / 331.4R
+Buzzer
