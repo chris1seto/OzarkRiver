@@ -197,6 +197,12 @@ extern void *_sbss, *_ebss;
 
 void __attribute__((naked, noreturn)) Reset_Handler()
 {
+	//Normally the CPU should will setup the based on the value from the first entry in the vector table.
+	//If you encounter problems with accessing stack variables during initialization, ensure the line below is enabled.
+	#ifdef sram_layout
+	asm ("ldr sp, =_estack");
+	#endif  
+
 	void **pSource, **pDest;
 	for (pSource = &_sidata, pDest = &_sdata; pDest != &_edata; pSource++, pDest++)
 		*pDest = *pSource;

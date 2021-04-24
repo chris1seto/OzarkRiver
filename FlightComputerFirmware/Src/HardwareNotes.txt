@@ -1,0 +1,28 @@
+MPU6050
+
+PPM in
+
+Spektrum
+
+Other
+#define LED0_PIN                PB3
+#define LED1_PIN                PB4
+#define BEEPER_PIN              PA12
+#define MAG_INT_EXTI            PC14
+#define GYRO_1_EXTI_PIN         PC13
+#define NAZE_SPI_INSTANCE       SPI2
+#define NAZE_SPI_CS_PIN         PB12
+
+
+** Confirmed:
+USART1_TX PA9
+USART1_RX PA10
+USART3_RX PB11 Spektrum
+LED0_PIN  PB3
+
+OUT1 PA6 TIM3_CH1
+OUT2 PA7 TIM3_CH2
+OUT3 PA11 TIM4_CH1
+OUT4 PA12 TIM4_CH2
+OUT5 PB8  TIM4_CH3
+OUT6 PB9  TIM4_CH4
