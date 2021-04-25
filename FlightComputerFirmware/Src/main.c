@@ -8,6 +8,7 @@
 #include "SpektrumRcIn.h"
 #include "ServoOut.h"
 #include "FlightControl.h"
+#include "Watchdog.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -28,6 +29,9 @@ int main(void)
   Retarget_Init();
   printf("%cUp!\r\n", 12);
 
+  // Init Watchdog
+  Watchdog_Init();
+
   // Init LEDs
   Leds_Init();
   Leds_Off(LED_RED | LED_BLUE);
@@ -42,7 +46,7 @@ int main(void)
   FlightControl_Init();
 
   // Start main task
-  xTaskCreate(MainTask, "MAIN", 1024, NULL, 0, NULL);
+  xTaskCreate(MainTask, "MAIN", 256, NULL, 0, NULL);
 
   // Start scheuler
   vTaskStartScheduler();
@@ -57,7 +61,11 @@ static void MainTask(void* args)
 
   while(true)
   {
-    Leds_Toggle(LED_BLUE | LED_RED, led_state);
+    // Refresh watchdog
+    Watchdog_Refresh();
+    
+    // Blink LED
+    Leds_Toggle(LED_RED, led_state);
     led_state = !led_state;
 
     vTaskDelay(100);

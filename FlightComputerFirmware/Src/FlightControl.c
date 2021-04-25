@@ -45,9 +45,6 @@ typedef struct
   enum SERVOOUT_CHANNEL target;
 } ServoActuatorTranslation_t;
 
-#define PITCH_TRIM .1f
-#define ROLL_TRIM 0f
-
 #define SERVO_ACTUATOR_COUNT 3
 const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
 {
@@ -121,7 +118,7 @@ static void FlightControlTask(void* arg)
       control_outputs.yaw = 0;
       control_outputs.pitch = 0;
       control_outputs.roll = 0;
-      control_outputs.throttle = 0;
+      control_outputs.throttle = CONTROL_MIN;
     }
     else
     {
