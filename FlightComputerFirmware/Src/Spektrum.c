@@ -14,6 +14,8 @@
 #define SPEKTRUM_CHANNELS_PER_FRAME  7
 #define SPEKTRUM_FRAME_SIZE          2 + (2 * SPEKTRUM_CHANNELS_PER_FRAME)
 
+#define SPEKTRUM_TICKS_TO_NORMAL(x) (x * 0.9765625f - 1000.0f)
+
 void Spektrum_Init(SpektrumInstance_t* const inst)
 {
   // Toggle Spektrum power on
@@ -120,7 +122,7 @@ uint32_t Spektrum_Process(SpektrumInstance_t* const inst, SpektrumFrame_t* const
 
         frames[frame_count].channels[channel_id].valid = true;
         frames[frame_count].channels[channel_id].timestamp = time_now;
-        frames[frame_count].channels[channel_id].value = channel_value;
+        frames[frame_count].channels[channel_id].value = SPEKTRUM_TICKS_TO_NORMAL(channel_value);
       }
       else if (channel_id == SPEKTRUM_CHANNEL_COUNT)
       {

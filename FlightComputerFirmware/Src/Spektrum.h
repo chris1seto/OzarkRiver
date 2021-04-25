@@ -14,7 +14,7 @@ typedef struct
 {
   bool valid;
   TickType_t timestamp;
-  uint16_t value;
+  float value;
 } SpektrumChannel_t;
 
 typedef struct
