@@ -39,7 +39,7 @@ void SpectrumRcIn_Init(void)
 
   //Spektrum_Bind(&spektrum_rx);
 
-  xTaskCreate(SpektrumRcInTask, TAG, 256, NULL, 0, NULL);
+  xTaskCreate(SpektrumRcInTask, TAG, 300, NULL, 0, NULL);
 }
 
 bool SpectrumRcIn_Bind(void)
@@ -95,7 +95,7 @@ static void SpektrumRcInTask(void* arg)
         spektrum_status.channels[i_channel].value = 0;
       }
     }
-    
+
     spektrum_status.timestamp = Ticks_Now();
 
     xQueueSendToBack(spektrum_status_queue, &spektrum_status, 0);

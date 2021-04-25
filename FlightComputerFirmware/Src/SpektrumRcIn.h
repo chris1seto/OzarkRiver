@@ -9,7 +9,7 @@ typedef struct
 {
   bool valid;
   TickType_t timestamp;
-  uint16_t value;
+  float value;
 } SpektrumRcInChannel_t;
 
 typedef struct

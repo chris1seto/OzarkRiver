@@ -14,12 +14,17 @@
 #define CONTROL_MIN -1000.0f
 #define CONTROL_MAX 1000.0f
 
+enum FLIGHTCONTROL_FAULT
+{
+  FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID = (1 << 0),
+};
+
 enum RC_INPUT_CHANNEL
 {
   RC_INPUT_CHANNEL_THROTTLE = 0,
-  RC_INPUT_CHANNEL_RUDDER = 1,
-  RC_INPUT_CHANNEL_AILERON = 2,
-  RC_INPUT_CHANNEL_ELEVATOR = 3,
+  RC_INPUT_CHANNEL_AILERON = 1,
+  RC_INPUT_CHANNEL_ELEVATOR = 2,
+  RC_INPUT_CHANNEL_RUDDER = 3,
   RC_INPUT_CHANNEL_MODE = 4,
 };
 
@@ -40,12 +45,15 @@ typedef struct
   enum SERVOOUT_CHANNEL target;
 } ServoActuatorTranslation_t;
 
+#define PITCH_TRIM .1f
+#define ROLL_TRIM 0f
+
 #define SERVO_ACTUATOR_COUNT 3
 const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
 {
-  [SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON]  = {1400.0f, 1500.0f, 1600.0f, SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON},
-  [SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON] = {1400.0f, 1500.0f, 1600.0f, SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON},
-  [SERVO_ACTUATOR_OUTPUT_THROTTLE] =     {1000.0f, 1500.0f, 2000.0f, SERVO_ACTUATOR_OUTPUT_THROTTLE},
+  [SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON]  = {1.1f, 1.65f, 2.0f, SERVOOUT_CHANNEL_1},
+  [SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON] = {2.0f, 1.40f, 1.1f, SERVOOUT_CHANNEL_2},
+  [SERVO_ACTUATOR_OUTPUT_THROTTLE] =     {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_3},
 };
 
 typedef struct
@@ -67,7 +75,7 @@ static const char* TAG = "FLIGHTCONTROL";
 
 void FlightControl_Init(void)
 {
-  xTaskCreate(FlightControlTask, TAG, 256, NULL, 0, NULL);
+  xTaskCreate(FlightControlTask, TAG, 512, NULL, 0, NULL);
 }
 
 static bool SpektrumChannelValid(const SpektrumRcInChannel_t* channel)
@@ -79,11 +87,6 @@ static bool SpektrumChannelValid(const SpektrumRcInChannel_t* channel)
 
   return true;
 }
-
-enum FLIGHTCONTROL_FAULT
-{
-  FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID = (1 << 0),
-};
 
 static void FlightControlTask(void* arg)
 {
@@ -123,9 +126,9 @@ static void FlightControlTask(void* arg)
     else
     {
       control_outputs.yaw = 0;
-      control_outputs.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR];
-      control_outputs.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON];
-      control_outputs.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE];
+      control_outputs.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value;
+      control_outputs.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value;
+      control_outputs.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
     }
 
     CommitActuators(&control_outputs);
@@ -138,20 +141,24 @@ static void ServoActuatorTranslate(const float* input, const ServoActuatorTransl
 {
   uint32_t i;
   float channel_output;
-  float channel_input;
+  float channel_constrain;
+  float output[3];
 
   for (i = 0; i < translation_count; i++)
   {
-    channel_input = MathX_ConstrainF(input, CONTROL_MIN, CONTROL_MAX);
+    channel_constrain = MathX_ConstrainF(input[i], CONTROL_MIN, CONTROL_MAX);
 
     if (input[i] >= 0)
     {
+      channel_output = MathX_MapF(channel_constrain, 0, CONTROL_MAX, translation[i].output_center, translation[i].output_max);
     }
     else
     {
+      channel_output = MathX_MapF(channel_constrain, 0, CONTROL_MIN, translation[i].output_center, translation[i].output_min);
     }
 
-    //ServoOut_Set(translation[i].target, channel_output);
+    output[i] = channel_output;
+    ServoOut_Set(translation[i].target, channel_output);
   }
 }
 
@@ -159,9 +166,9 @@ static void CommitActuators(const FlightControlOutput_t* controls)
 {
   float actuators[SERVO_ACTUATOR_COUNT];
 
-  actuators[SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON] = controls->pitch + controls->roll;
-  actuators[SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON] = controls->pitch - controls->roll;
+  actuators[SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON] = -controls->pitch - controls->roll;
+  actuators[SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON] = -controls->pitch + controls->roll;
   actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE] = controls->throttle;
 
-  ServoActuatorTranslate(&actuators, &servo_accuator_translations, SERVO_ACTUATOR_COUNT);
+  ServoActuatorTranslate((float*)&actuators, (ServoActuatorTranslation_t*)&servo_accuator_translations, SERVO_ACTUATOR_COUNT);
 }

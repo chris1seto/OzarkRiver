@@ -7,6 +7,7 @@
 #include "Leds.h"
 #include "SpektrumRcIn.h"
 #include "ServoOut.h"
+#include "FlightControl.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -26,27 +27,26 @@ int main(void)
   __HAL_RCC_PWR_CLK_ENABLE();
   Retarget_Init();
   printf("%cUp!\r\n", 12);
-  
+
   // Init LEDs
   Leds_Init();
   Leds_Off(LED_RED | LED_BLUE);
-  
+
   // Init Spektrum
   SpectrumRcIn_Init();
 
-  // Init servos
+  // Init ServoOut
   ServoOut_Init();
-  ServoOut_Set(SERVOOUT_CHANNEL_1, 1.500);
-  ServoOut_Set(SERVOOUT_CHANNEL_2, 1.600);
-  ServoOut_Set(SERVOOUT_CHANNEL_3, 1.500);
-  ServoOut_Set(SERVOOUT_CHANNEL_4, 1.600);
-  
+
+  // Init FlightControl
+  FlightControl_Init();
+
   // Start main task
   xTaskCreate(MainTask, "MAIN", 1024, NULL, 0, NULL);
-  
-  // Start scheuler 
+
+  // Start scheuler
   vTaskStartScheduler();
-  
+
   printf("Warning: Scheduler returned\r\n");
   while (1);
 }
@@ -54,14 +54,12 @@ int main(void)
 static void MainTask(void* args)
 {
   bool led_state = false;
-  
+
   while(true)
   {
     Leds_Toggle(LED_BLUE | LED_RED, led_state);
     led_state = !led_state;
-    
-    //printf("%li\r\n", TIM3->CNT);
-    
+
     vTaskDelay(100);
   }
 }
