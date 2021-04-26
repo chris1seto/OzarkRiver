@@ -9,6 +9,7 @@
 #include "ServoOut.h"
 #include "FlightControl.h"
 #include "Watchdog.h"
+#include "I2c1.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -30,11 +31,16 @@ int main(void)
   printf("%cUp!\r\n", 12);
 
   // Init Watchdog
+  Watchdog_Refresh();
   Watchdog_Init();
+  Watchdog_Refresh();
 
   // Init LEDs
   Leds_Init();
-  Leds_Off(LED_RED | LED_BLUE);
+  Leds_Off(LED_RED);
+
+  // Init I2c1
+  I2c1_Init();
 
   // Init Spektrum
   SpectrumRcIn_Init();
@@ -52,7 +58,7 @@ int main(void)
   vTaskStartScheduler();
 
   printf("Warning: Scheduler returned\r\n");
-  while (1);
+  while (true);
 }
 
 static void MainTask(void* args)
@@ -63,7 +69,7 @@ static void MainTask(void* args)
   {
     // Refresh watchdog
     Watchdog_Refresh();
-    
+
     // Blink LED
     Leds_Toggle(LED_RED, led_state);
     led_state = !led_state;
