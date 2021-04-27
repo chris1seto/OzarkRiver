@@ -78,19 +78,9 @@ int8_t memcmpOwn(const void *Ptr1, const void *Ptr2, size_t Count) {
  * the clock source to use the X Gyro for reference, which is slightly better than
  * the default internal clock source.
  */
-void MPU6050_initialize(uint8_t address) {
-	//DBG_vPrintf(TRACE_APP, "\tSet address\n");
+void MPU6050_initialize(uint8_t address)
+{
 	MPU6050_devAddr = address;
-	//DBG_vPrintf(TRACE_APP, "\tSet clock source to XGyro\n");
-	MPU6050_setClockSource(MPU6050_CLOCK_PLL_XGYRO);
-	//DBG_vPrintf(TRACE_APP, "\tSet gyro range to 250�/s\n");
-	MPU6050_setFullScaleGyroRange(MPU6050_GYRO_FS_250);
-	//DBG_vPrintf(TRACE_APP, "\tSet accel range to 2G\n");
-	MPU6050_setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
-	//DBG_vPrintf(TRACE_APP, "\tSet sleep disable\n");
-	MPU6050_setSleepEnabled(false); // thanks to Jack Elston for pointing this one out!
-	//DBG_vPrintf(TRACE_APP, "\tSet filters mode 5: Acc {10Hz | 13.8ms} Gyr {10Hz | 13.4ms} Sampling 1kHz\n");
-	MPU6050_setDLPFMode(5);
 }
 
 /** Verify the I2C connection.

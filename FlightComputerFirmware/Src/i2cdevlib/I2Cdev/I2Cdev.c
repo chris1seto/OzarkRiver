@@ -41,12 +41,12 @@ static int8_t _i2c_receive(const uint8_t dev_addr, uint8_t* const data, const ui
 
 static int8_t _i2c_transmit(const uint8_t dev_addr, const uint8_t* data, const uint8_t len, const bool ack)
 {
-  return (I2c1_Write(dev_addr, data, len)) ? 0 : -1;
+  return (I2c1_Write(dev_addr << 1, data, len)) ? 0 : -1;
 }
 
 static int8_t _i2c_receive(const uint8_t dev_addr, uint8_t* const data, const uint8_t len, const bool ack)
 {
-  return (I2c1_Read(dev_addr, data, len)) ? 0 : -1;
+  return (I2c1_Read(dev_addr << 1, data, len)) ? 0 : -1;
 }
 
 #define i2c_transmit_ack(dev_addr, data, len) 	_i2c_transmit(dev_addr, data, len, true)

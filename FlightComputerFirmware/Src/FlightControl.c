@@ -14,6 +14,15 @@
 #define CONTROL_MIN -1000.0f
 #define CONTROL_MAX 1000.0f
 
+enum FLIGHTCONTROL_MODE
+{
+  FLIGHTCONTROL_MODE_DIRECT,
+  FLIGHTCONTROL_MODE_RATE,
+  FLIGHTCONTROL_MODE_ATTITUDE,
+};
+
+static enum FLIGHTCONTROL_MODE flight_control_mode = FLIGHTCONTROL_MODE_DIRECT;
+
 enum FLIGHTCONTROL_FAULT
 {
   FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID = (1 << 0),
@@ -46,7 +55,7 @@ typedef struct
 } ServoActuatorTranslation_t;
 
 #define SERVO_ACTUATOR_COUNT 3
-const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
+static const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
 {
   [SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON]  = {1.1f, 1.65f, 2.0f, SERVOOUT_CHANNEL_1},
   [SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON] = {2.0f, 1.40f, 1.1f, SERVOOUT_CHANNEL_2},

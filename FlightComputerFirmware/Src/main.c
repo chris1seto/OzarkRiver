@@ -10,6 +10,7 @@
 #include "FlightControl.h"
 #include "Watchdog.h"
 #include "I2c1.h"
+#include "ImuAhrs.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -31,9 +32,9 @@ int main(void)
   printf("%cUp!\r\n", 12);
 
   // Init Watchdog
-  Watchdog_Refresh();
+  /*Watchdog_Refresh();
   Watchdog_Init();
-  Watchdog_Refresh();
+  Watchdog_Refresh();*/
 
   // Init LEDs
   Leds_Init();
@@ -47,6 +48,9 @@ int main(void)
 
   // Init ServoOut
   ServoOut_Init();
+
+  // Init ImuAhrs
+  ImuAhrs_Init();
 
   // Init FlightControl
   FlightControl_Init();
@@ -68,7 +72,7 @@ static void MainTask(void* args)
   while(true)
   {
     // Refresh watchdog
-    Watchdog_Refresh();
+    //Watchdog_Refresh();
 
     // Blink LED
     Leds_Toggle(LED_RED, led_state);
@@ -82,6 +86,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -106,6 +111,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+  }
+
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1;
+  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_SYSCLK;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
   }
 }

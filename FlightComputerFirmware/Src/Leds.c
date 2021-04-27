@@ -14,17 +14,12 @@ void Leds_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 
-  // PB3 0
+  // PB3 RED
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pin = GPIO_PIN_3;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  // PB4 1
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pin = GPIO_PIN_4;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  Leds_Off(LED_RED | LED_BLUE);
+  Leds_Off(LED_RED);
 }
 
 void Leds_On(const uint32_t leds)
@@ -33,12 +28,6 @@ void Leds_On(const uint32_t leds)
   if (leds & LED_RED)
   {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, false);
-  }
-
-  // PB4 1
-  if (leds & LED_BLUE)
-  {
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, false);
   }
 }
 
@@ -49,12 +38,6 @@ void Leds_Off(const uint32_t leds)
   {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, true);
   }
-
-  // PB4 1
-  if (leds & LED_BLUE)
-  {
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, true);
-  }
 }
 
 void Leds_Toggle(const uint32_t leds, const bool enabled)
@@ -63,11 +46,5 @@ void Leds_Toggle(const uint32_t leds, const bool enabled)
   if (leds & LED_RED)
   {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, !enabled);
-  }
-
-  // PB4 1
-  if (leds & LED_BLUE)
-  {
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, !enabled);
   }
 }
