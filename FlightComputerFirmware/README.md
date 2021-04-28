@@ -1,1 +1,1 @@
-## A simple Stm32F0 based flight controller
+## A simple Stm32F3 based flight controller
