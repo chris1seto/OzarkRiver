@@ -72,6 +72,6 @@ bool Hmc5983_SetConfigA(Hmc5983Instance_t* const i, const uint8_t config_a);
 bool Hmc5983_SetConfigB(Hmc5983Instance_t* const i, const uint8_t config_b);
 bool Hmc5983_SetMode(Hmc5983Instance_t* const i, const uint8_t mode);
 bool Hmc5983_GetMag(Hmc5983Instance_t* const i, int16_t* const x, int16_t* const y, int16_t* const z);
-bool Hmc5983_GetTemperature(Hmc5983Instance_t* const i, int16_t temperature);
+bool Hmc5983_GetTemperature(Hmc5983Instance_t* const i, int16_t* const temperature);
 
 #endif

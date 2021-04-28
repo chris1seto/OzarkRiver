@@ -39,7 +39,19 @@ bool Hmc5983_CheckIdentification(Hmc5983Instance_t* const i)
 
 bool Hmc5983_SetConfigA(Hmc5983Instance_t* const i, const uint8_t config_a)
 {
+  uint8_t readback;
+
   if (!i->write(i->address, HMC_REG_CONFIGURATION_A, (uint8_t*)&config_a, 1))
+  {
+    return false;
+  }
+
+  if (!i->read(i->address, HMC_REG_CONFIGURATION_A, (uint8_t*)&readback, 1))
+  {
+    return false;
+  }
+
+  if (readback != config_a)
   {
     return false;
   }
@@ -49,7 +61,19 @@ bool Hmc5983_SetConfigA(Hmc5983Instance_t* const i, const uint8_t config_a)
 
 bool Hmc5983_SetConfigB(Hmc5983Instance_t* const i, const uint8_t config_b)
 {
+  uint8_t readback;
+
   if (!i->write(i->address, HMC_REG_CONFIGURATION_B, (uint8_t*)&config_b, 1))
+  {
+    return false;
+  }
+
+  if (!i->read(i->address, HMC_REG_CONFIGURATION_B, (uint8_t*)&readback, 1))
+  {
+    return false;
+  }
+
+  if (readback != config_b)
   {
     return false;
   }
@@ -59,7 +83,19 @@ bool Hmc5983_SetConfigB(Hmc5983Instance_t* const i, const uint8_t config_b)
 
 bool Hmc5983_SetMode(Hmc5983Instance_t* const i, const uint8_t mode)
 {
+  uint8_t readback;
+
   if (!i->write(i->address, HMC_REG_MODE, (uint8_t*)&mode, 1))
+  {
+    return false;
+  }
+
+  if (!i->read(i->address, HMC_REG_MODE, (uint8_t*)&readback, 1))
+  {
+    return false;
+  }
+
+  if (readback != mode)
   {
     return false;
   }
@@ -83,7 +119,7 @@ bool Hmc5983_GetMag(Hmc5983Instance_t* const i, int16_t* const x, int16_t* const
   return true;
 }
 
-bool Hmc5983_GetTemperature(Hmc5983Instance_t* const i, int16_t temperature)
+bool Hmc5983_GetTemperature(Hmc5983Instance_t* const i, int16_t* const temperature)
 {
   uint8_t temperature_reg[sizeof(int16_t)];
 
@@ -92,7 +128,7 @@ bool Hmc5983_GetTemperature(Hmc5983Instance_t* const i, int16_t temperature)
     return false;
   }
 
-  BigEndian_Unpack16(&temperature_reg[0], temperature);
+  BigEndian_Unpack16(&temperature_reg[0], (uint16_t*)temperature);
 
   return true;
 }

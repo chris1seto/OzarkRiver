@@ -23,7 +23,10 @@ static FusionAhrs fusion_ahrs;
 
 #define MPU6050_DPS_PER_LSB 0.06103515625f
 #define MPU6050_GS_PER_LSB  0.00048828125f
-#define HMC5983_GS_PER_LSB  0.0f
+
+#define HMC5983_TICKS_TO_GAUS(x) (((float)x *.92f) / 1000.0f)
+#define GUASS_TO_MICROTESLA(x)     (x * 100.0f)
+#define HMC_TICKS_TO_uT(x)       GUASS_TO_MICROTESLA(HMC5983_TICKS_TO_GAUS(x))
 
 static int16_t gyro_offset[3] = {0, 0, 0};
 static int16_t accel_offset[3] = {0, 0, 0};
@@ -62,7 +65,7 @@ static const FusionRotationMatrix mpu6050_alignment =
   }
 };
 
-// Align hmc5983
+// Align hmc5983 90
 static const FusionRotationMatrix hmc5983_alignment =
 {
   .array =
@@ -104,11 +107,11 @@ void ImuAhrs_Init(void)
 
   // Init MPU6050
   MPU6050_initialize(MPU6050_DEFAULT_ADDRESS);
-	MPU6050_setClockSource(MPU6050_CLOCK_PLL_XGYRO);
-	MPU6050_setFullScaleGyroRange(MPU6050_GYRO_FS_2000);
-	MPU6050_setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
-	MPU6050_setSleepEnabled(false);
-	MPU6050_setDLPFMode(0);
+  MPU6050_setClockSource(MPU6050_CLOCK_PLL_XGYRO);
+  MPU6050_setFullScaleGyroRange(MPU6050_GYRO_FS_2000);
+  MPU6050_setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
+  MPU6050_setSleepEnabled(false);
+  MPU6050_setDLPFMode(0);
 
   MPU6050_setXGyroOffset(0);
   MPU6050_setYGyroOffset(0);
@@ -127,7 +130,7 @@ void ImuAhrs_Init(void)
   hmc5983_inst.address = HMC5983_ADDRESS;
   hmc5983_inst.read = I2c1_ReadMemory8;
   hmc5983_inst.write = I2c1_WriteMemory8;
-  
+
   if (Hmc5983_CheckIdentification(&hmc5983_inst))
   {
     LOG_I(TAG, "HMC5983 OK");
@@ -135,6 +138,21 @@ void ImuAhrs_Init(void)
   else
   {
     LOG_E(TAG, "HMC5983 fail");
+  }
+
+  if (!Hmc5983_SetConfigA(&hmc5983_inst, HMC5983_MEASUREMENT_MODE_NORMAL | HMC5983_DATA_OUTPUT_RATE_220_0 | HMC5983_TEMPERATURE_ENABLE_ENABLE | HMC5983_SAMPLES_AVERAGED_1))
+  {
+    LOG_E(TAG, "Hmc5983_SetConfigA failed");
+  }
+
+  if (!Hmc5983_SetConfigB(&hmc5983_inst, HMC5983_GAIN_0))
+  {
+    LOG_E(TAG, "Hmc5983_SetConfigB failed");
+  }
+
+  if (!Hmc5983_SetMode(&hmc5983_inst, HMC5983_OPERATING_MODE_CONTINUOUS))
+  {
+    LOG_E(TAG, "Hmc5983_SetMode failed");
   }
 
   // Init Madgwick
@@ -172,7 +190,7 @@ static void ImuAhrsTask(void* arg)
   {
     // Get accel/gyro
     MPU6050_getMotion6(&accel[0], &accel[1], &accel[2], &gyro[0], &gyro[1], &gyro[2]);
-    
+
     // Get mag
     Hmc5983_GetMag(&hmc5983_inst, &mag[0], &mag[1], &mag[2]);
 
@@ -237,11 +255,11 @@ static void ImuAhrsTask(void* arg)
     uncalibrated_gyro.axis.x = gyro[0];
     uncalibrated_gyro.axis.y = gyro[1];
     uncalibrated_gyro.axis.z = gyro[2];
-    
+
     // Load mag data
-    uncalibrated_mag.axis.x = gyro[0] * HMC5983_GS_PER_LSB;
-    uncalibrated_mag.axis.y = gyro[1] * HMC5983_GS_PER_LSB;
-    uncalibrated_mag.axis.z = gyro[2] * HMC5983_GS_PER_LSB;
+    uncalibrated_mag.axis.x = HMC_TICKS_TO_uT(gyro[0]);
+    uncalibrated_mag.axis.y = HMC_TICKS_TO_uT(gyro[1]);
+    uncalibrated_mag.axis.z = HMC_TICKS_TO_uT(gyro[2]);
 
     calibrated_gyro = FusionCalibrationInertial(uncalibrated_gyro, mpu6050_alignment, gyroscope_sensitivity, FUSION_VECTOR3_ZERO);
     calibrated_accel = FusionCalibrationInertial(uncalibrated_accel, mpu6050_alignment, accelerometer_sensitivity, FUSION_VECTOR3_ZERO);
@@ -252,7 +270,6 @@ static void ImuAhrsTask(void* arg)
 
     // Update AHRS
     FusionAhrsUpdate(&fusion_ahrs, calibrated_gyro, calibrated_accel, calibrated_mag, madgwick_sample_period_s);
-    //FusionAhrsUpdateWithoutMagnetometer(&fusion_ahrs, calibrated_gyro, calibrated_accel, madgwick_sample_period_s);
 
     // Generate euler angles
     euler_angles = FusionQuaternionToEulerAngles(FusionAhrsGetQuaternion(&fusion_ahrs));
@@ -261,6 +278,7 @@ static void ImuAhrsTask(void* arg)
     //printf("%.2f %.2f %.2f\r\n", accel[0] * MPU6050_GS_PER_LSB, accel[1] *MPU6050_GS_PER_LSB, accel[2]*MPU6050_GS_PER_LSB);
     //printf("%04.2f %04.2f %04.2f\r\n", gyro[0] * MPU6050_DPS_PER_LSB, gyro[1] * MPU6050_DPS_PER_LSB, gyro[2] * MPU6050_DPS_PER_LSB);
     printf("Roll = %0.1f, Pitch = %0.1f, Yaw = %0.1f\r\n", euler_angles.angle.roll, euler_angles.angle.pitch, euler_angles.angle.yaw);
+    //printf("%i %i %i, %f, %f, %f\r\n", mag[0], mag[1], mag[2], uncalibrated_mag.axis.x, uncalibrated_mag.axis.y, uncalibrated_mag.axis.z);
 
     x = !x;
 
