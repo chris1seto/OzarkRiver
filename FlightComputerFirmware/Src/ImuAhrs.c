@@ -23,7 +23,7 @@ static FusionAhrs fusion_ahrs;
 
 #define MPU6050_DPS_PER_LSB 0.06103515625f
 #define MPU6050_GS_PER_LSB  0.00048828125f
-#define HMC5983_
+#define HMC5983_GS_PER_LSB  0.0f
 
 static int16_t gyro_offset[3] = {0, 0, 0};
 static int16_t accel_offset[3] = {0, 0, 0};
@@ -127,6 +127,15 @@ void ImuAhrs_Init(void)
   hmc5983_inst.address = HMC5983_ADDRESS;
   hmc5983_inst.read = I2c1_ReadMemory8;
   hmc5983_inst.write = I2c1_WriteMemory8;
+  
+  if (Hmc5983_CheckIdentification(&hmc5983_inst))
+  {
+    LOG_I(TAG, "HMC5983 OK");
+  }
+  else
+  {
+    LOG_E(TAG, "HMC5983 fail");
+  }
 
   // Init Madgwick
   // Initialise gyroscope bias correction
@@ -137,7 +146,7 @@ void ImuAhrs_Init(void)
   FusionAhrsInitialise(&fusion_ahrs, 0.5f);
 
   // Set optional magnetic field limits
-  //FusionAhrsSetMagneticField(&fusion_ahrs, 20.0f, 70.0f); // valid magnetic field range = 20 uT to 70 uT
+  FusionAhrsSetMagneticField(&fusion_ahrs, 20.0f, 70.0f);
 
   xTaskCreate(ImuAhrsTask, TAG, 512, NULL, 0, NULL);
 }
@@ -146,13 +155,14 @@ static void ImuAhrsTask(void* arg)
 {
   int16_t accel[3];
   int16_t gyro[3];
+  int16_t mag[3];
   FusionVector3 uncalibrated_gyro;
   FusionVector3 uncalibrated_accel;
   FusionVector3 uncalibrated_mag;
   FusionEulerAngles euler_angles;
   FusionVector3 calibrated_gyro;
   FusionVector3 calibrated_accel;
-  //FusionVector3 calibrated_mag;
+  FusionVector3 calibrated_mag;
   bool x = false;
   bool is_converged = false;
   uint32_t i;
@@ -162,6 +172,9 @@ static void ImuAhrsTask(void* arg)
   {
     // Get accel/gyro
     MPU6050_getMotion6(&accel[0], &accel[1], &accel[2], &gyro[0], &gyro[1], &gyro[2]);
+    
+    // Get mag
+    Hmc5983_GetMag(&hmc5983_inst, &mag[0], &mag[1], &mag[2]);
 
     // Shim measurements
     for (i = 0; i < 3; i++)
@@ -224,19 +237,24 @@ static void ImuAhrsTask(void* arg)
     uncalibrated_gyro.axis.x = gyro[0];
     uncalibrated_gyro.axis.y = gyro[1];
     uncalibrated_gyro.axis.z = gyro[2];
+    
+    // Load mag data
+    uncalibrated_mag.axis.x = gyro[0] * HMC5983_GS_PER_LSB;
+    uncalibrated_mag.axis.y = gyro[1] * HMC5983_GS_PER_LSB;
+    uncalibrated_mag.axis.z = gyro[2] * HMC5983_GS_PER_LSB;
 
     calibrated_gyro = FusionCalibrationInertial(uncalibrated_gyro, mpu6050_alignment, gyroscope_sensitivity, FUSION_VECTOR3_ZERO);
     calibrated_accel = FusionCalibrationInertial(uncalibrated_accel, mpu6050_alignment, accelerometer_sensitivity, FUSION_VECTOR3_ZERO);
-    //calibrated_mag = FusionCalibrationMagnetic(uncalibrated_mag, FUSION_ROTATION_MATRIX_IDENTITY, hard_iron_bias);
+    calibrated_mag = FusionCalibrationMagnetic(uncalibrated_mag, hmc5983_alignment, hard_iron_bias);
 
     // Update gyroscope bias correction
     calibrated_gyro = FusionBiasUpdate(&fusion_bias, calibrated_gyro);
 
     // Update AHRS
-    //FusionAhrsUpdate(&fusion_ahrs, calibrated_gyro, calibrated_accel, calibrated_mag, madgwick_sample_period_s);
-    FusionAhrsUpdateWithoutMagnetometer(&fusion_ahrs, calibrated_gyro, calibrated_accel, madgwick_sample_period_s);
+    FusionAhrsUpdate(&fusion_ahrs, calibrated_gyro, calibrated_accel, calibrated_mag, madgwick_sample_period_s);
+    //FusionAhrsUpdateWithoutMagnetometer(&fusion_ahrs, calibrated_gyro, calibrated_accel, madgwick_sample_period_s);
 
-    // Print Euler angles
+    // Generate euler angles
     euler_angles = FusionQuaternionToEulerAngles(FusionAhrsGetQuaternion(&fusion_ahrs));
 
     if (x)

@@ -66,4 +66,12 @@ typedef struct
   bool (*read)(const uint8_t, const uint8_t, uint8_t* const, const uint32_t);
 } Hmc5983Instance_t;
 
+void Hmc5983_Init(Hmc5983Instance_t* const i);
+bool Hmc5983_CheckIdentification(Hmc5983Instance_t* const i);
+bool Hmc5983_SetConfigA(Hmc5983Instance_t* const i, const uint8_t config_a);
+bool Hmc5983_SetConfigB(Hmc5983Instance_t* const i, const uint8_t config_b);
+bool Hmc5983_SetMode(Hmc5983Instance_t* const i, const uint8_t mode);
+bool Hmc5983_GetMag(Hmc5983Instance_t* const i, int16_t* const x, int16_t* const y, int16_t* const z);
+bool Hmc5983_GetTemperature(Hmc5983Instance_t* const i, int16_t temperature);
+
 #endif
