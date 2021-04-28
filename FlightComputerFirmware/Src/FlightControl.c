@@ -13,6 +13,7 @@
 
 #define CONTROL_MIN -1000.0f
 #define CONTROL_MAX 1000.0f
+#define CONTROL_RANGE (CONTROL_MAX * 2)
 
 enum FLIGHTCONTROL_MODE
 {
@@ -94,6 +95,24 @@ static bool SpektrumChannelValid(const SpektrumRcInChannel_t* channel)
   return true;
 }
 
+static void SetFlightMode(const enum FLIGHTCONTROL_MODE mode)
+{
+  switch (mode)
+  {
+    case FLIGHTCONTROL_MODE_DIRECT:
+      flight_control_mode = FLIGHTCONTROL_MODE_DIRECT;
+      break;
+      
+    case FLIGHTCONTROL_MODE_RATE:
+      flight_control_mode = FLIGHTCONTROL_MODE_RATE;
+      break;
+      
+    case FLIGHTCONTROL_MODE_ATTITUDE:
+      flight_control_mode = FLIGHTCONTROL_MODE_ATTITUDE;
+      break;
+  }
+}
+
 static void FlightControlTask(void* arg)
 {
   SpektrumRcInStatus_t spektrum_status = {0};
@@ -121,20 +140,45 @@ static void FlightControlTask(void* arg)
         SET(faults, FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID);
       }
     }
-
-    if (IS_SET(faults, FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID))
+    
+    // Select flight mode
+    if (spektrum_status.channels[RC_INPUT_CHANNEL_MODE].value > 500)
     {
-      control_outputs.yaw = 0;
-      control_outputs.pitch = 0;
-      control_outputs.roll = 0;
-      control_outputs.throttle = CONTROL_MIN;
+      SetFlightMode(FLIGHTCONTROL_MODE_ATTITUDE);
+    }
+    else if (spektrum_status.channels[RC_INPUT_CHANNEL_MODE].value > -500)
+    {
+      SetFlightMode(FLIGHTCONTROL_MODE_RATE);
     }
     else
     {
-      control_outputs.yaw = 0;
-      control_outputs.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value;
-      control_outputs.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value;
-      control_outputs.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+      SetFlightMode(FLIGHTCONTROL_MODE_DIRECT);
+    }
+
+    switch (flight_control_mode)
+    {
+      case FLIGHTCONTROL_MODE_DIRECT:
+        if (IS_SET(faults, FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID))
+        {
+          control_outputs.yaw = 0;
+          control_outputs.pitch = 0;
+          control_outputs.roll = 0;
+          control_outputs.throttle = CONTROL_MIN;
+        }
+        else
+        {
+          control_outputs.yaw = 0;
+          control_outputs.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value;
+          control_outputs.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value;
+          control_outputs.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+        }
+        break;
+        
+      case FLIGHTCONTROL_MODE_RATE:
+        break;
+        
+      case FLIGHTCONTROL_MODE_ATTITUDE:
+        break;
     }
 
     CommitActuators(&control_outputs);
