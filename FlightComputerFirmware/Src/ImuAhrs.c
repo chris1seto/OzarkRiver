@@ -22,11 +22,8 @@ static FusionAhrs fusion_ahrs;
 #define STATIONARY_THRESHOLD .5f
 
 #define MPU6050_DPS_PER_LSB 0.06103515625f
-#define MPU6050_GS_PER_LSB  0.00048828125f
-
-#define HMC5983_TICKS_TO_GAUS(x) (((float)x *.92f) / 1000.0f)
-#define GUASS_TO_MICROTESLA(x)     (x * 100.0f)
-#define HMC_TICKS_TO_uT(x)       GUASS_TO_MICROTESLA(HMC5983_TICKS_TO_GAUS(x))
+#define MPU6050_GS_PER_LSB  0.00048828125
+#define HMC_TICKS_TO_uT(x)  (x * (1.0f / 1090.0f) * 100.0f)
 
 static int16_t gyro_offset[3] = {0, 0, 0};
 static int16_t accel_offset[3] = {0, 0, 0};
@@ -91,6 +88,8 @@ static Hmc5983Instance_t hmc5983_inst = {0};
 enum IMUAHRS_FLAGS
 {
   IMUAHRS_FLAGS_MPU6050_FAIL = (1 << 0),
+  IMUAHRS_FLAGS_HMC5983_FAIL = (1 << 1),
+  IMUAHRS_FLAGS_CALIBRATING = (1 << 1),
 };
 
 static uint32_t flags = 0;
@@ -145,7 +144,7 @@ void ImuAhrs_Init(void)
     LOG_E(TAG, "Hmc5983_SetConfigA failed");
   }
 
-  if (!Hmc5983_SetConfigB(&hmc5983_inst, HMC5983_GAIN_0))
+  if (!Hmc5983_SetConfigB(&hmc5983_inst, HMC5983_GAIN_1))
   {
     LOG_E(TAG, "Hmc5983_SetConfigB failed");
   }
@@ -181,7 +180,6 @@ static void ImuAhrsTask(void* arg)
   FusionVector3 calibrated_gyro;
   FusionVector3 calibrated_accel;
   FusionVector3 calibrated_mag;
-  bool x = false;
   bool is_converged = false;
   uint32_t i;
   bool axes_in_range;
@@ -257,9 +255,9 @@ static void ImuAhrsTask(void* arg)
     uncalibrated_gyro.axis.z = gyro[2];
 
     // Load mag data
-    uncalibrated_mag.axis.x = HMC_TICKS_TO_uT(gyro[0]);
-    uncalibrated_mag.axis.y = HMC_TICKS_TO_uT(gyro[1]);
-    uncalibrated_mag.axis.z = HMC_TICKS_TO_uT(gyro[2]);
+    uncalibrated_mag.axis.x = HMC_TICKS_TO_uT(mag[0]);
+    uncalibrated_mag.axis.y = HMC_TICKS_TO_uT(mag[1]);
+    uncalibrated_mag.axis.z = HMC_TICKS_TO_uT(mag[2]);
 
     calibrated_gyro = FusionCalibrationInertial(uncalibrated_gyro, mpu6050_alignment, gyroscope_sensitivity, FUSION_VECTOR3_ZERO);
     calibrated_accel = FusionCalibrationInertial(uncalibrated_accel, mpu6050_alignment, accelerometer_sensitivity, FUSION_VECTOR3_ZERO);
@@ -274,15 +272,9 @@ static void ImuAhrsTask(void* arg)
     // Generate euler angles
     euler_angles = FusionQuaternionToEulerAngles(FusionAhrsGetQuaternion(&fusion_ahrs));
 
-    if (x)
-    //printf("%.2f %.2f %.2f\r\n", accel[0] * MPU6050_GS_PER_LSB, accel[1] *MPU6050_GS_PER_LSB, accel[2]*MPU6050_GS_PER_LSB);
-    //printf("%04.2f %04.2f %04.2f\r\n", gyro[0] * MPU6050_DPS_PER_LSB, gyro[1] * MPU6050_DPS_PER_LSB, gyro[2] * MPU6050_DPS_PER_LSB);
-    printf("Roll = %0.1f, Pitch = %0.1f, Yaw = %0.1f\r\n", euler_angles.angle.roll, euler_angles.angle.pitch, euler_angles.angle.yaw);
-    //printf("%i %i %i, %f, %f, %f\r\n", mag[0], mag[1], mag[2], uncalibrated_mag.axis.x, uncalibrated_mag.axis.y, uncalibrated_mag.axis.z);
-
-    x = !x;
-
+    // Load status
     imu_ahrs_status.timestamp = Ticks_Now();
+    imu_ahrs_status.flags = flags;
     imu_ahrs_status.pitch = euler_angles.angle.pitch;
     imu_ahrs_status.roll = euler_angles.angle.roll;
     imu_ahrs_status.yaw = euler_angles.angle.yaw;

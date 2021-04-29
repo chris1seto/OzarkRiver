@@ -10,6 +10,7 @@
 typedef struct
 {
   TickType_t timestamp;
+  uint32_t flags;
   float pitch;
   float roll;
   float yaw;
