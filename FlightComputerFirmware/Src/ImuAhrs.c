@@ -12,6 +12,7 @@
 #include "Ticks.h"
 #include "I2c1.h"
 #include "ImuAhrs.h"
+#include "Bits.h"
 
 static QueueHandle_t imu_ahrs_status_queue;
 static ImuAhrsStatus_t imu_ahrs_status = {0};
@@ -202,6 +203,7 @@ static void ImuAhrsTask(void* arg)
     // Simple mechanism to calibrate gyro drift offset
     if (!is_calibrated)
     {
+      SET(flags, IMUAHRS_FLAGS_CALIBRATING);
       axes_in_range = true;
 
       for (i = 0; i < 3; i++)
@@ -234,6 +236,7 @@ static void ImuAhrsTask(void* arg)
         {
           LOG_W(TAG, "Gyro calibrated! (%i, %i, %i)", gyro_offset[0], gyro_offset[1], gyro_offset[2]);
           is_calibrated = true;
+          CLR(flags, IMUAHRS_FLAGS_CALIBRATING);
         }
       }
       else

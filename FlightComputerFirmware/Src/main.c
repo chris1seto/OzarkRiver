@@ -31,6 +31,9 @@ int main(void)
   Retarget_Init();
   printf("%cUp!\r\n", 12);
 
+  // Short delay to let the board settle
+  HAL_Delay(100);
+
   // Init Watchdog
   /*Watchdog_Refresh();
   Watchdog_Init();
