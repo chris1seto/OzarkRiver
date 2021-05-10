@@ -1,8 +1,12 @@
 #ifndef BITS_H
 #define BITS_H
 
-#define SET(bitfield, bit) bitfield |= bit; 
-#define CLR(bitfield, bit) bitfield &= ~bit;
-#define IS_SET(bitfield, bit) (bitfield & bit)
+#include <stdint.h>
+#include <stdbool.h>
+
+extern bool Bits_IsSet(const uint32_t x, const uint32_t y);
+extern void Bits_Set(uint32_t* const x, const uint32_t y);
+extern void Bits_Clear(uint32_t* const x, const uint32_t y);
+
 
 #endif

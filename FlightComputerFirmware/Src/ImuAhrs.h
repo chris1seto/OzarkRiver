@@ -7,6 +7,13 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+enum IMUAHRS_FLAGS
+{
+  IMUAHRS_FLAGS_MPU6050_FAIL = (1 << 0),
+  IMUAHRS_FLAGS_HMC5983_FAIL = (1 << 1),
+  IMUAHRS_FLAGS_CALIBRATING = (1 << 2),
+};
+
 typedef struct
 {
   TickType_t timestamp;

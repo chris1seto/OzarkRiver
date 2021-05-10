@@ -86,13 +86,6 @@ static float madgwick_sample_period_s;
 
 static Hmc5983Instance_t hmc5983_inst = {0};
 
-enum IMUAHRS_FLAGS
-{
-  IMUAHRS_FLAGS_MPU6050_FAIL = (1 << 0),
-  IMUAHRS_FLAGS_HMC5983_FAIL = (1 << 1),
-  IMUAHRS_FLAGS_CALIBRATING = (1 << 1),
-};
-
 static uint32_t flags = 0;
 
 static const char* TAG = "IMUAHRS";
@@ -101,12 +94,22 @@ static const char* TAG = "IMUAHRS";
 
 static void ImuAhrsTask(void* arg);
 
-void ImuAhrs_Init(void)
-{
-  imu_ahrs_status_queue = xQueueCreate(1, sizeof(ImuAhrsStatus_t));
+#define INIT_COUNT_LIMIT 5
 
-  // Init MPU6050
+static bool Mpu6050Init()
+{
   MPU6050_initialize(MPU6050_DEFAULT_ADDRESS);
+  
+  if (MPU6050_testConnection())
+  {
+    LOG_I(TAG, "MPU6050 OK");
+  }
+  else
+  {
+    LOG_E(TAG, "MPU6050 fail");
+    return false;
+  }
+  
   MPU6050_setClockSource(MPU6050_CLOCK_PLL_XGYRO);
   MPU6050_setFullScaleGyroRange(MPU6050_GYRO_FS_2000);
   MPU6050_setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
@@ -116,21 +119,12 @@ void ImuAhrs_Init(void)
   MPU6050_setXGyroOffset(0);
   MPU6050_setYGyroOffset(0);
   MPU6050_setZGyroOffset(0);
+  
+  return true;
+}
 
-  if (MPU6050_testConnection())
-  {
-    LOG_I(TAG, "MPU6050 OK");
-  }
-  else
-  {
-    LOG_E(TAG, "MPU6050 fail");
-  }
-
-  // Init Hmc5983
-  hmc5983_inst.address = HMC5983_ADDRESS;
-  hmc5983_inst.read = I2c1_ReadMemory8;
-  hmc5983_inst.write = I2c1_WriteMemory8;
-
+static bool Hmc5983Init(void)
+{
   if (Hmc5983_CheckIdentification(&hmc5983_inst))
   {
     LOG_I(TAG, "HMC5983 OK");
@@ -138,21 +132,72 @@ void ImuAhrs_Init(void)
   else
   {
     LOG_E(TAG, "HMC5983 fail");
+    return false;
   }
 
   if (!Hmc5983_SetConfigA(&hmc5983_inst, HMC5983_MEASUREMENT_MODE_NORMAL | HMC5983_DATA_OUTPUT_RATE_220_0 | HMC5983_TEMPERATURE_ENABLE_ENABLE | HMC5983_SAMPLES_AVERAGED_1))
   {
     LOG_E(TAG, "Hmc5983_SetConfigA failed");
+    return false;
   }
 
   if (!Hmc5983_SetConfigB(&hmc5983_inst, HMC5983_GAIN_1))
   {
     LOG_E(TAG, "Hmc5983_SetConfigB failed");
+    return false;
   }
 
   if (!Hmc5983_SetMode(&hmc5983_inst, HMC5983_OPERATING_MODE_CONTINUOUS))
   {
     LOG_E(TAG, "Hmc5983_SetMode failed");
+    return false;
+  }
+  
+  return true;
+}
+
+void ImuAhrs_Init(void)
+{
+  uint32_t i;
+  
+  imu_ahrs_status_queue = xQueueCreate(1, sizeof(ImuAhrsStatus_t));
+
+  // Init MPU6050
+  for (i = 0; i < INIT_COUNT_LIMIT; i++)
+  {
+    if (Mpu6050Init())
+    {
+      break;
+    }
+    
+    // If we're here, init failed
+    HAL_Delay(100);
+  }
+  
+  if (i == INIT_COUNT_LIMIT)
+  {
+    Bits_Set(&flags, IMUAHRS_FLAGS_MPU6050_FAIL);
+  }
+
+  // Init Hmc5983
+  hmc5983_inst.address = HMC5983_ADDRESS;
+  hmc5983_inst.read = I2c1_ReadMemory8;
+  hmc5983_inst.write = I2c1_WriteMemory8;
+
+  for (i = 0; i < INIT_COUNT_LIMIT; i++)
+  {
+    if (Hmc5983Init())
+    {
+      break;
+    }
+    
+    // If we're here, init failed
+    HAL_Delay(100);
+  }
+  
+  if (i == INIT_COUNT_LIMIT)
+  {
+    Bits_Set(&flags, IMUAHRS_FLAGS_HMC5983_FAIL);
   }
 
   // Init Madgwick
@@ -203,7 +248,7 @@ static void ImuAhrsTask(void* arg)
     // Simple mechanism to calibrate gyro drift offset
     if (!is_calibrated)
     {
-      SET(flags, IMUAHRS_FLAGS_CALIBRATING);
+      Bits_Set(&flags, IMUAHRS_FLAGS_CALIBRATING);
       axes_in_range = true;
 
       for (i = 0; i < 3; i++)
@@ -236,7 +281,7 @@ static void ImuAhrsTask(void* arg)
         {
           LOG_W(TAG, "Gyro calibrated! (%i, %i, %i)", gyro_offset[0], gyro_offset[1], gyro_offset[2]);
           is_calibrated = true;
-          CLR(flags, IMUAHRS_FLAGS_CALIBRATING);
+          Bits_Clear(&flags, IMUAHRS_FLAGS_CALIBRATING);
         }
       }
       else
@@ -279,11 +324,13 @@ static void ImuAhrsTask(void* arg)
     imu_ahrs_status.timestamp = Ticks_Now();
     imu_ahrs_status.flags = flags;
     imu_ahrs_status.pitch = euler_angles.angle.pitch;
-    imu_ahrs_status.roll = euler_angles.angle.roll;
-    imu_ahrs_status.yaw = euler_angles.angle.yaw;
-    imu_ahrs_status.pitch_rate = 0;
-    imu_ahrs_status.roll_rate = 0;
-    imu_ahrs_status.yaw_rate = 0;
+    imu_ahrs_status.roll = -euler_angles.angle.roll;
+    imu_ahrs_status.yaw = -euler_angles.angle.yaw;
+    imu_ahrs_status.pitch_rate = calibrated_gyro.axis.y;
+    imu_ahrs_status.roll_rate = calibrated_gyro.axis.x;
+    imu_ahrs_status.yaw_rate = -calibrated_gyro.axis.z;
+
+    xQueueOverwrite(imu_ahrs_status_queue, &imu_ahrs_status);
 
     vTaskDelay(IMUAHRS_PERIOD);
   }
