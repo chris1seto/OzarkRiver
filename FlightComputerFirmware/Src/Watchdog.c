@@ -6,7 +6,7 @@ void Watchdog_Init(void)
 {
   // Init watchdog
   watchdog_handle.Instance = IWDG;
-  watchdog_handle.Init.Prescaler = IWDG_PRESCALER_16;
+  watchdog_handle.Init.Prescaler = IWDG_PRESCALER_4;
   watchdog_handle.Init.Reload = 0x0fff;
   watchdog_handle.Init.Window = 0x0fff;
   

@@ -9,13 +9,13 @@ static TIM_HandleTypeDef tim4_handle;
 
 #define SERVO_PERIOD_MS   20
 
-#define TIM_3_PRESCALER   22
+#define TIM_3_PRESCALER   11
 #define TIM_3_PERIOD      65445
-#define TIM_3_MS_TO_TICKS(x) (x * 3272.25)
+#define TIM_3_MS_TO_TICKS(x) (x * 3272.25 * 2)
 
-#define TIM_4_PRESCALER   22
+#define TIM_4_PRESCALER   11
 #define TIM_4_PERIOD      65445
-#define TIM_4_MS_TO_TICKS(x) (uint16_t)(x * 3272.25)
+#define TIM_4_MS_TO_TICKS(x) (uint16_t)(x * 3272.25 * 2)
 
 void ServoOut_Init(void)
 {

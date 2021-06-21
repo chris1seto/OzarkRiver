@@ -27,7 +27,7 @@ void Spektrum_Init(SpektrumInstance_t* const inst)
   // Init serial
   if (inst->serial_interface != NULL)
   {
-    inst->serial_interface->init();
+    inst->serial_interface->init(115200, 0);
   }
 }
 
@@ -61,7 +61,7 @@ void Spektrum_Bind(SpektrumInstance_t* const inst)
   }
 
   // Init serial again
-  inst->serial_interface->init();
+  inst->serial_interface->init(115200, 0);
 }
 
 uint32_t Spektrum_Process(SpektrumInstance_t* const inst, SpektrumFrame_t* const frames, const uint32_t max_frames)

@@ -17,6 +17,26 @@
 static QueueHandle_t imu_ahrs_status_queue;
 static ImuAhrsStatus_t imu_ahrs_status = {0};
 
+typedef struct
+{
+  int16_t x;
+  int16_t y;
+  int16_t z;
+} Xyz16_t;
+
+typedef union
+{
+  Xyz16_t s;
+  int16_t a[3];
+} Xyz16u_t;
+
+typedef struct
+{
+  Xyz16u_t accel;
+  Xyz16u_t gyro;
+  Xyz16u_t mag;
+} Imu_t;
+
 static FusionBias fusion_bias;
 static FusionAhrs fusion_ahrs;
 
@@ -99,7 +119,7 @@ static void ImuAhrsTask(void* arg);
 static bool Mpu6050Init()
 {
   MPU6050_initialize(MPU6050_DEFAULT_ADDRESS);
-  
+
   if (MPU6050_testConnection())
   {
     LOG_I(TAG, "MPU6050 OK");
@@ -109,17 +129,24 @@ static bool Mpu6050Init()
     LOG_E(TAG, "MPU6050 fail");
     return false;
   }
-  
+
   MPU6050_setClockSource(MPU6050_CLOCK_PLL_XGYRO);
+  HAL_Delay(5);
   MPU6050_setFullScaleGyroRange(MPU6050_GYRO_FS_2000);
+  HAL_Delay(5);
   MPU6050_setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
+  HAL_Delay(5);
   MPU6050_setSleepEnabled(false);
+  HAL_Delay(5);
   MPU6050_setDLPFMode(0);
+  HAL_Delay(5);
 
   MPU6050_setXGyroOffset(0);
   MPU6050_setYGyroOffset(0);
   MPU6050_setZGyroOffset(0);
-  
+
+  MPU6050_setSleepEnabled(false);
+
   return true;
 }
 
@@ -152,14 +179,14 @@ static bool Hmc5983Init(void)
     LOG_E(TAG, "Hmc5983_SetMode failed");
     return false;
   }
-  
+
   return true;
 }
 
 void ImuAhrs_Init(void)
 {
   uint32_t i;
-  
+
   imu_ahrs_status_queue = xQueueCreate(1, sizeof(ImuAhrsStatus_t));
 
   // Init MPU6050
@@ -167,13 +194,19 @@ void ImuAhrs_Init(void)
   {
     if (Mpu6050Init())
     {
+      // This is a hack, but for some reason the mpu6050 doesn't return good data without this routine running twice.
+      // It's probably a timing thing or who knows what, I haven't dug into it at all and I don't really care to
+      // the Mpu6050 is EOL and I'm only using it because it happens to be on this board, so I'm not going to put effort into fixing this
+      // As long as it continues to work after being init'd twice  ¯\_(ツ)_/¯
+      Mpu6050Init();
+
       break;
     }
-    
+
     // If we're here, init failed
     HAL_Delay(100);
   }
-  
+
   if (i == INIT_COUNT_LIMIT)
   {
     Bits_Set(&flags, IMUAHRS_FLAGS_MPU6050_FAIL);
@@ -190,11 +223,11 @@ void ImuAhrs_Init(void)
     {
       break;
     }
-    
+
     // If we're here, init failed
     HAL_Delay(100);
   }
-  
+
   if (i == INIT_COUNT_LIMIT)
   {
     Bits_Set(&flags, IMUAHRS_FLAGS_HMC5983_FAIL);
@@ -211,14 +244,70 @@ void ImuAhrs_Init(void)
   // Set optional magnetic field limits
   FusionAhrsSetMagneticField(&fusion_ahrs, 20.0f, 70.0f);
 
-  xTaskCreate(ImuAhrsTask, TAG, 512, NULL, 0, NULL);
+  xTaskCreate(ImuAhrsTask, TAG, 700, NULL, 0, NULL);
+}
+
+static bool is_converged = false;
+
+  
+
+static void Calibrate(const Imu_t* raw_imu_data)
+{
+  uint32_t i;
+  bool axes_in_range;
+  
+  // Simple mechanism to calibrate gyro drift offset
+  if (!is_calibrated)
+  {
+    Bits_Set(&flags, IMUAHRS_FLAGS_CALIBRATING);
+    axes_in_range = true;
+
+    for (i = 0; i < 3; i++)
+    {
+      if (raw_imu_data->gyro.a[i] > 0)
+      {
+        gyro_offset[i]++;
+      }
+      else
+      {
+        gyro_offset[i]--;
+      }
+
+      if (raw_imu_data->gyro.a[i] > GYRO_DEADZONE || raw_imu_data->gyro.a[i] < -GYRO_DEADZONE)
+      {
+        axes_in_range = false;
+      }
+    }
+
+    if (axes_in_range)
+    {
+      if (!is_converged)
+      {
+        Ticks_Reset(&converged_start_time);
+      }
+
+      is_converged = true;
+
+      if (Ticks_IsExpired(converged_start_time, CONVERGED_TIMEOUT))
+      {
+        LOG_W(TAG, "Gyro calibrated! (%i, %i, %i)", gyro_offset[0], gyro_offset[1], gyro_offset[2]);
+        is_calibrated = true;
+        Bits_Clear(&flags, IMUAHRS_FLAGS_CALIBRATING);
+      }
+    }
+    else
+    {
+      is_converged = false;
+    }
+  }
 }
 
 static void ImuAhrsTask(void* arg)
 {
-  int16_t accel[3];
-  int16_t gyro[3];
-  int16_t mag[3];
+  uint32_t i;
+  
+  Imu_t raw_imu_data;
+  
   FusionVector3 uncalibrated_gyro;
   FusionVector3 uncalibrated_accel;
   FusionVector3 uncalibrated_mag;
@@ -226,86 +315,58 @@ static void ImuAhrsTask(void* arg)
   FusionVector3 calibrated_gyro;
   FusionVector3 calibrated_accel;
   FusionVector3 calibrated_mag;
-  bool is_converged = false;
-  uint32_t i;
-  bool axes_in_range;
 
   while (true)
   {
     // Get accel/gyro
-    MPU6050_getMotion6(&accel[0], &accel[1], &accel[2], &gyro[0], &gyro[1], &gyro[2]);
+    MPU6050_getMotion6(&raw_imu_data.accel.s.x, &raw_imu_data.accel.s.y, &raw_imu_data.accel.s.z,
+      &raw_imu_data.gyro.s.x, &raw_imu_data.gyro.s.y, &raw_imu_data.gyro.s.z);
 
     // Get mag
-    Hmc5983_GetMag(&hmc5983_inst, &mag[0], &mag[1], &mag[2]);
+    Hmc5983_GetMag(&hmc5983_inst, &raw_imu_data.mag.s.x, &raw_imu_data.mag.s.y, &raw_imu_data.mag.s.z);
 
     // Shim measurements
     for (i = 0; i < 3; i++)
     {
-      accel[i] -= accel_offset[i];
-      gyro[i] -= gyro_offset[i];
+      raw_imu_data.accel.a[i] -= accel_offset[i];
+      raw_imu_data.gyro.a[i] -= gyro_offset[i];
     }
 
-    // Simple mechanism to calibrate gyro drift offset
     if (!is_calibrated)
     {
-      Bits_Set(&flags, IMUAHRS_FLAGS_CALIBRATING);
-      axes_in_range = true;
+      Calibrate(&raw_imu_data);
+      
+      // Load status
+      imu_ahrs_status.timestamp = Ticks_Now();
+      imu_ahrs_status.flags = flags;
+      imu_ahrs_status.pitch = 0;
+      imu_ahrs_status.roll = 0;
+      imu_ahrs_status.yaw = 0;
+      imu_ahrs_status.pitch_rate = 0;
+      imu_ahrs_status.roll_rate = 0;
+      imu_ahrs_status.yaw_rate = 0;
 
-      for (i = 0; i < 3; i++)
-      {
-        if (gyro[i] > 0)
-        {
-          gyro_offset[i]++;
-        }
-        else
-        {
-          gyro_offset[i]--;
-        }
+      xQueueOverwrite(imu_ahrs_status_queue, &imu_ahrs_status);
 
-        if (gyro[i] > GYRO_DEADZONE || gyro[i] < -GYRO_DEADZONE)
-        {
-          axes_in_range = false;
-        }
-      }
-
-      if (axes_in_range)
-      {
-        if (!is_converged)
-        {
-          Ticks_Reset(&converged_start_time);
-        }
-
-        is_converged = true;
-
-        if (Ticks_IsExpired(converged_start_time, CONVERGED_TIMEOUT))
-        {
-          LOG_W(TAG, "Gyro calibrated! (%i, %i, %i)", gyro_offset[0], gyro_offset[1], gyro_offset[2]);
-          is_calibrated = true;
-          Bits_Clear(&flags, IMUAHRS_FLAGS_CALIBRATING);
-        }
-      }
-      else
-      {
-        is_converged = false;
-      }
-
+      vTaskDelay(IMUAHRS_PERIOD);
+      
       continue;
     }
 
     // Load accel data
-    uncalibrated_accel.axis.x = accel[0];
-    uncalibrated_accel.axis.y = accel[1];
-    uncalibrated_accel.axis.z = accel[2];
+    uncalibrated_accel.axis.x = raw_imu_data.accel.s.x;
+    uncalibrated_accel.axis.y = raw_imu_data.accel.s.y;
+    uncalibrated_accel.axis.z = raw_imu_data.accel.s.z;
 
     // Load gyro data
-    uncalibrated_gyro.axis.x = gyro[0];
-    uncalibrated_gyro.axis.y = gyro[1];
-    uncalibrated_gyro.axis.z = gyro[2];
+    uncalibrated_gyro.axis.x = raw_imu_data.gyro.s.x;
+    uncalibrated_gyro.axis.y = raw_imu_data.gyro.s.y;
+    uncalibrated_gyro.axis.z = raw_imu_data.gyro.s.z;
 
     // Load mag data
-    uncalibrated_mag.axis.x = HMC_TICKS_TO_uT(mag[0]);
-    uncalibrated_mag.axis.y = HMC_TICKS_TO_uT(mag[1]);
-    uncalibrated_mag.axis.z = HMC_TICKS_TO_uT(mag[2]);
+    uncalibrated_mag.axis.x = HMC_TICKS_TO_uT(raw_imu_data.mag.s.x);
+    uncalibrated_mag.axis.y = HMC_TICKS_TO_uT(raw_imu_data.mag.s.y);
+    uncalibrated_mag.axis.z = HMC_TICKS_TO_uT(raw_imu_data.mag.s.z);
 
     calibrated_gyro = FusionCalibrationInertial(uncalibrated_gyro, mpu6050_alignment, gyroscope_sensitivity, FUSION_VECTOR3_ZERO);
     calibrated_accel = FusionCalibrationInertial(uncalibrated_accel, mpu6050_alignment, accelerometer_sensitivity, FUSION_VECTOR3_ZERO);

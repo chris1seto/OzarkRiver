@@ -7,6 +7,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#include "event_groups.h"
 #include "QueueBuffer.h"
 #include "Ticks.h"
 #include "SerialInterface.h"
@@ -23,10 +24,21 @@ static volatile uint32_t dma_head = 0;
 static QueueBuffer_t serial_rx_queue_buffer;
 static uint8_t serial_rx_bufer[DMA_BUFFER_SIZE];
 
+static EventGroupHandle_t serial_event_group;
+static EventGroupHandle_t serial_interface_event_group;
+
+static uint32_t data_rx_event_count = 0;
+
+enum SERIAL_EVENT
+{
+  SERIAL_EVENT_NEW_DATA_RX = (1 << 0),
+  SERIAL_EVENT_NEW_DATA_TX = (1 << 1),
+};
+
 static const char* TAG = "SERIAL3";
 
 static void Serial3Deinit(void);
-static bool Serial3Init(void);
+static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_count);
 static void CopyFromDma(void);
 static void Serial3Task(void* arg);
 
@@ -37,6 +49,7 @@ static SerialInterface_t serial_interface =
   NULL,
   &serial_rx_queue_buffer,
   NULL,
+  &serial_interface_event_group,
 };
 
 SerialInterface_t* Serial3_GetInterface(void)
@@ -44,16 +57,22 @@ SerialInterface_t* Serial3_GetInterface(void)
   return (SerialInterface_t*)&serial_interface;
 }
 
+#define SERIAL_MAX_PERIOD   (20 / portTICK_PERIOD_MS)
+
 static void Serial3Deinit(void)
 {
 }
 
-static bool Serial3Init(void)
+static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_count)
 {
   GPIO_InitTypeDef GPIO_InitStruct;
 
   // Init data structures
   QueueBuffer_Init(&serial_rx_queue_buffer, serial_rx_bufer, DMA_BUFFER_SIZE);
+  serial_event_group = xEventGroupCreate();
+  serial_interface_event_group = xEventGroupCreate();
+
+  data_rx_event_count = new_data_rx_event_count;
 
   // Enable clocks
   __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -104,7 +123,12 @@ static bool Serial3Init(void)
 
   HAL_UART_Init(&uart_handle);
 
+  __HAL_UART_ENABLE_IT(&uart_handle, UART_IT_IDLE);
+
   __HAL_UART_ENABLE(&uart_handle);
+
+  HAL_NVIC_SetPriority(USART3_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(USART3_IRQn);
 
   // Clear possible faults before enabling reception
   __HAL_UART_CLEAR_PEFLAG(&uart_handle);
@@ -116,9 +140,21 @@ static bool Serial3Init(void)
   LL_USART_EnableDMAReq_RX(USART3);
   LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
 
-  xTaskCreate(Serial3Task, TAG, 128, NULL, 0, NULL);
+  xTaskCreate(Serial3Task, TAG, 500, NULL, 0, NULL);
 
   return true;
+}
+
+void USART3_IRQHandler(void)
+{
+  BaseType_t HigherPriorityTaskWoken;
+
+  if (__HAL_UART_GET_FLAG(&uart_handle, UART_FLAG_IDLE))
+  {
+    __HAL_UART_CLEAR_IDLEFLAG(&uart_handle);
+
+    xEventGroupSetBitsFromISR(serial_event_group, SERIAL_EVENT_NEW_DATA_RX, &HigherPriorityTaskWoken);
+  }
 }
 
 static void CopyFromDma(void)
@@ -159,9 +195,23 @@ static void Serial3Task(void* arg)
 {
   while (true)
   {
-    // Copy data in from uart
+    // We want to fire ever SERIAL_MAX_PERIOD or sooner when an event happens
+    // Waiting for event bits or a timeout is our blocking call
+    xEventGroupWaitBits(serial_event_group, SERIAL_EVENT_NEW_DATA_RX, false, false, SERIAL_MAX_PERIOD);
+
+    if (xEventGroupGetBits(serial_event_group) & SERIAL_EVENT_NEW_DATA_RX)
+    {
+      xEventGroupClearBits(serial_event_group, SERIAL_EVENT_NEW_DATA_RX);
+    }
+
+    // Copy data in from UART RX
+    // Do this whenever we run
     CopyFromDma();
 
-    vTaskDelay(10);
+    // If we have enough bytes to fire a new data event
+    if (QueueBuffer_Count(&serial_rx_queue_buffer) > data_rx_event_count)
+    {
+      xEventGroupSetBits(serial_interface_event_group, SERIAL_INTERFACE_EVENT_NEW_DATA_RX);
+    }
   }
 }

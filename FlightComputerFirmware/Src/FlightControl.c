@@ -17,8 +17,14 @@
 #define CONTROL_MAX 1000.0f
 #define CONTROL_RANGE (CONTROL_MAX * 2)
 
+#define PITCH_RATE_MAX    120
+#define ROLL_RATE_MAX     120
+
 static Pid_t pitch_rate_pid = {0};
 static Pid_t roll_rate_pid = {0};
+
+static Pid_t pitch_attitude_pid = {0};
+static Pid_t roll_attitude_pid = {0};
 
 enum FLIGHTCONTROL_MODE
 {
@@ -40,6 +46,7 @@ typedef struct
   float pitch;
   float roll;
   float yaw;
+  float throttle;
 } FlightControlCommandDirect_t;
 
 typedef struct
@@ -47,6 +54,7 @@ typedef struct
   float pitch_rate;
   float roll_rate;
   float yaw_rate;
+  float throttle;
 } FlightControlCommandRate_t;
 
 typedef struct
@@ -54,6 +62,7 @@ typedef struct
   float pitch;
   float roll;
   float yaw;
+  float throttle;
 } FlightControlCommandAttitude_t;
 
 typedef struct
@@ -67,7 +76,6 @@ typedef struct
     FlightControlCommandAttitude_t attitude;
   };
 
-  float throttle;
 } FlightControlCommand_t;
 
 enum FLIGHTCONTROL_FAULT
@@ -118,8 +126,11 @@ typedef struct
   float throttle;
 } FlightControlOutput_t;
 
-#define PITCH_RATE_STICK_SCALER .3f
-#define ROLL_RATE_STICK_SCALER .5f
+#define PITCH_RATE_STICK_SCALER .35f
+#define ROLL_RATE_STICK_SCALER  .5f
+
+#define PITCH_ATTITUDE_STICK_SCALER (90.0f / CONTROL_MAX)
+#define ROLL_ATTITUDE_STICK_SCALER (90.0f / CONTROL_MAX)
 
 static enum FLIGHTCONTROL_COMMAND last_flight_control_command = FLIGHTCONTROL_COMMAND_NONE;
 
@@ -134,12 +145,19 @@ static const char* TAG = "FLIGHTCONTROL";
 
 void FlightControl_Init(void)
 {
-  // Configure PID
+  // Configure rate PID
   Pid_SetOutputLimit(&pitch_rate_pid, CONTROL_MIN, CONTROL_MAX);
   Pid_SetOutputLimit(&roll_rate_pid, CONTROL_MIN, CONTROL_MAX);
 
-  Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.5, 0, 0);
+  Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.8, 0, 0);
   Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 2.5, 0, 0);
+
+  // Configure attitude PID
+  Pid_SetOutputLimit(&pitch_attitude_pid, CONTROL_MIN, CONTROL_MAX);
+  Pid_SetOutputLimit(&roll_attitude_pid, CONTROL_MIN, CONTROL_MAX);
+
+  Pid_SetTuning(&pitch_attitude_pid, FLIGHTCONTROL_PERIOD, 2.8, 0, 0);
+  Pid_SetTuning(&roll_attitude_pid, FLIGHTCONTROL_PERIOD, 2.5, 0, 0);
 
   xTaskCreate(FlightControlTask, TAG, 512, NULL, 0, NULL);
 }
@@ -152,6 +170,28 @@ static bool SpektrumChannelValid(const SpektrumRcInChannel_t* channel)
   }
 
   return true;
+}
+
+static void ComputeAttitude(FlightControlOutput_t* const control_outputs, const ImuAhrsStatus_t* imu_ahrs_status, const FlightControlCommandAttitude_t* command)
+{
+  float pitch_rate_setpoint;
+  float roll_rate_setpoint;
+
+  float pitch_rate_correction;
+  float roll_rate_correction;
+
+  // Compute attitude -> rate correction
+  pitch_rate_setpoint = Pid_Calculate(&pitch_attitude_pid, command->pitch, imu_ahrs_status->pitch);
+  roll_rate_setpoint = Pid_Calculate(&roll_attitude_pid, command->roll, imu_ahrs_status->roll);
+
+  // Compute rate correction
+  pitch_rate_correction = Pid_Calculate(&pitch_rate_pid, pitch_rate_setpoint, imu_ahrs_status->pitch_rate);
+  roll_rate_correction = Pid_Calculate(&roll_rate_pid, roll_rate_setpoint, imu_ahrs_status->roll_rate);
+
+  control_outputs->yaw = 0;
+  control_outputs->pitch = pitch_rate_correction;
+  control_outputs->roll = roll_rate_correction;
+  control_outputs->throttle = command->throttle;
 }
 
 static void FlightControlTask(void* arg)
@@ -222,24 +262,23 @@ static void FlightControlTask(void* arg)
       flight_control_command.direct.pitch = 0;
       flight_control_command.direct.roll = 0;
       flight_control_command.direct.yaw = 0;
-      flight_control_command.throttle = 0;
+      flight_control_command.direct.throttle = CONTROL_MIN;
     }
     else
     {
-      if (!Bits_IsSet(faults, FLIGHTCONTROL_FAULT_IMUAHRS_INVALID))
+      if (Bits_IsSet(faults, FLIGHTCONTROL_FAULT_IMUAHRS_INVALID))
       {
         tx_flight_control_mode = FLIGHTCONTROL_MODE_DIRECT;
       }
 
       switch (tx_flight_control_mode)
       {
-        case FLIGHTCONTROL_MODE_ATTITUDE:
         case FLIGHTCONTROL_MODE_DIRECT:
           flight_control_command.command = FLIGHTCONTROL_COMMAND_DIRECT;
           flight_control_command.direct.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value;
           flight_control_command.direct.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value;
           flight_control_command.direct.yaw = 0;
-          flight_control_command.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+          flight_control_command.direct.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
           break;
 
         case FLIGHTCONTROL_MODE_RATE:
@@ -247,16 +286,16 @@ static void FlightControlTask(void* arg)
           flight_control_command.rate.pitch_rate = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value * PITCH_RATE_STICK_SCALER;
           flight_control_command.rate.roll_rate = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_RATE_STICK_SCALER;
           flight_control_command.rate.yaw_rate = 0;
-          flight_control_command.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+          flight_control_command.rate.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
           break;
 
-        /*case FLIGHTCONTROL_MODE_ATTITUDE:
-          flight_control_command.command = FLIGHTCONTROL_COMMAND_RATE;
-          flight_control_command.rate.pitch = 0;
-          flight_control_command.rate.roll = 0;
-          flight_control_command.rate.yaw = 0;
-          flight_control_command.throttle = 0;
-          break;*/
+        case FLIGHTCONTROL_MODE_ATTITUDE:
+          flight_control_command.command = FLIGHTCONTROL_COMMAND_ATTITUDE;
+          flight_control_command.attitude.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value * PITCH_ATTITUDE_STICK_SCALER;
+          flight_control_command.attitude.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_ATTITUDE_STICK_SCALER;;
+          flight_control_command.attitude.yaw = 0;
+          flight_control_command.attitude.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+          break;
       }
     }
 
@@ -274,8 +313,8 @@ static void FlightControlTask(void* arg)
         control_outputs.yaw = flight_control_command.direct.yaw;
         control_outputs.pitch = flight_control_command.direct.pitch;
         control_outputs.roll = flight_control_command.direct.roll;
-        control_outputs.throttle = flight_control_command.throttle;
-        last_flight_control_command =  FLIGHTCONTROL_COMMAND_DIRECT;
+        control_outputs.throttle = flight_control_command.direct.throttle;
+        last_flight_control_command = FLIGHTCONTROL_COMMAND_DIRECT;
         break;
 
       // Rate based (degrees per second)
@@ -283,11 +322,12 @@ static void FlightControlTask(void* arg)
         control_outputs.yaw = 0;
         control_outputs.pitch = Pid_Calculate(&pitch_rate_pid, flight_control_command.rate.pitch_rate, imu_ahrs_status.pitch_rate);
         control_outputs.roll = Pid_Calculate(&roll_rate_pid, flight_control_command.rate.roll_rate, imu_ahrs_status.roll_rate);
-        control_outputs.throttle = flight_control_command.throttle;
+        control_outputs.throttle = flight_control_command.rate.throttle;
         last_flight_control_command = FLIGHTCONTROL_COMMAND_RATE;
         break;
 
       case FLIGHTCONTROL_COMMAND_ATTITUDE:
+        ComputeAttitude(&control_outputs, &imu_ahrs_status, &flight_control_command.attitude);
         last_flight_control_command = FLIGHTCONTROL_COMMAND_ATTITUDE;
         break;
 

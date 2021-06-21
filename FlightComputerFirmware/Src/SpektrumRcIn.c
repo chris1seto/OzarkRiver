@@ -13,19 +13,19 @@ static QueueHandle_t spektrum_status_queue;
 
 static SpektrumRcInStatus_t spektrum_status = {0};
 
+static SerialInterface_t* serial_interface;
+
 static void SpektrumRcInTask(void* arg);
 
 #define NEW_SPEKTRUM_FRAME_COUNT 5
 
-#define SPEKTRUMRCIN_PERIOD   (10 / portTICK_PERIOD_MS)
+#define SPEKTRUMRCIN_PERIOD   (20 / portTICK_PERIOD_MS)
 #define SPEKTRUM_TIMEOUT      (50 / portTICK_PERIOD_MS)
 
 static const char* TAG = "SPEKTRUM";
 
 void SpectrumRcIn_Init(void)
 {
-  SerialInterface_t* serial_interface;
-
   spektrum_status_queue = xQueueCreate(1, sizeof(SpektrumRcInStatus_t));
 
   serial_interface = Serial3_GetInterface();
@@ -39,7 +39,7 @@ void SpectrumRcIn_Init(void)
 
   //Spektrum_Bind(&spektrum_rx);
 
-  xTaskCreate(SpektrumRcInTask, TAG, 300, NULL, 0, NULL);
+  xTaskCreate(SpektrumRcInTask, TAG, 500, NULL, 0, NULL);
 }
 
 bool SpectrumRcIn_Bind(void)
@@ -54,7 +54,7 @@ bool SpectrumRcIn_Reset(void)
 
 bool SpectrumRcIn_GetStatus(SpektrumRcInStatus_t* const status)
 {
-  return (xQueueReceive(spektrum_status_queue, status, 0) == pdTRUE);
+  return (xQueuePeek(spektrum_status_queue, status, 0) == pdTRUE);
 }
 
 static void SpektrumRcInTask(void* arg)
@@ -66,6 +66,13 @@ static void SpektrumRcInTask(void* arg)
 
   while (true)
   {
+    xEventGroupWaitBits(*serial_interface->serial_events, SERIAL_INTERFACE_EVENT_NEW_DATA_RX, false, false, SPEKTRUMRCIN_PERIOD);
+
+    if (xEventGroupGetBits(*serial_interface->serial_events) & SERIAL_INTERFACE_EVENT_NEW_DATA_RX)
+    {
+      xEventGroupClearBits(*serial_interface->serial_events, SERIAL_INTERFACE_EVENT_NEW_DATA_RX);
+    }
+
     recovered_frames = Spektrum_Process(&spektrum_rx, (SpektrumFrame_t*)&new_spektrum_frames, NEW_SPEKTRUM_FRAME_COUNT);
 
     // For each recovered frame...
@@ -98,8 +105,6 @@ static void SpektrumRcInTask(void* arg)
 
     spektrum_status.timestamp = Ticks_Now();
 
-    xQueueSendToBack(spektrum_status_queue, &spektrum_status, 0);
-
-    vTaskDelay(SPEKTRUMRCIN_PERIOD);
+    xQueueOverwrite(spektrum_status_queue, &spektrum_status);
   }
 }

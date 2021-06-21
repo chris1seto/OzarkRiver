@@ -11,6 +11,7 @@
 #include "Watchdog.h"
 #include "I2c1.h"
 #include "ImuAhrs.h"
+#include "Ticks.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -25,6 +26,12 @@ int main(void)
   // Configure low level chip features
   HAL_Init();
   SystemClock_Config();
+
+  // Init Watchdog
+  Watchdog_Refresh();
+  Watchdog_Init();
+  Watchdog_Refresh();
+
   HAL_InitTick(0);
   __HAL_RCC_SYSCFG_CLK_ENABLE();
   __HAL_RCC_PWR_CLK_ENABLE();
@@ -33,11 +40,6 @@ int main(void)
 
   // Short delay to let the board settle
   HAL_Delay(100);
-
-  // Init Watchdog
-  /*Watchdog_Refresh();
-  Watchdog_Init();
-  Watchdog_Refresh();*/
 
   // Init LEDs
   Leds_Init();
@@ -75,7 +77,7 @@ static void MainTask(void* args)
   while(true)
   {
     // Refresh watchdog
-    //Watchdog_Refresh();
+    Watchdog_Refresh();
 
     // Blink LED
     Leds_Toggle(LED_RED, led_state);
