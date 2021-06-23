@@ -97,9 +97,10 @@ enum RC_INPUT_CHANNEL
 
 enum SERVO_ACTUATOR_OUTPUT
 {
-  SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON = 0,
-  SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON = 1,
-  SERVO_ACTUATOR_OUTPUT_THROTTLE = 2,
+  SERVO_ACTUATOR_OUTPUT_THROTTLE = 0,
+  SERVO_ACTUATOR_OUTPUT_ELEVATOR = 1,
+  SERVO_ACTUATOR_OUTPUT_AILERON = 2,
+  SERVO_ACTUATOR_OUTPUT_RUDDER = 3,
 };
 
 typedef struct
@@ -110,12 +111,13 @@ typedef struct
   enum SERVOOUT_CHANNEL target;
 } ServoActuatorTranslation_t;
 
-#define SERVO_ACTUATOR_COUNT 3
+#define SERVO_ACTUATOR_COUNT 4
 static const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
 {
-  [SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON]  = {1.1f, 1.65f, 2.0f, SERVOOUT_CHANNEL_1},
-  [SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON] = {2.0f, 1.40f, 1.1f, SERVOOUT_CHANNEL_2},
-  [SERVO_ACTUATOR_OUTPUT_THROTTLE] =     {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_3},
+  [SERVO_ACTUATOR_OUTPUT_THROTTLE]  = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_1},
+  [SERVO_ACTUATOR_OUTPUT_AILERON]   = {0.85f, 1.65f, 2.15f, SERVOOUT_CHANNEL_2},
+  [SERVO_ACTUATOR_OUTPUT_ELEVATOR]  = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_3},
+  [SERVO_ACTUATOR_OUTPUT_RUDDER]    = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_4},
 };
 
 typedef struct
@@ -277,7 +279,7 @@ static void FlightControlTask(void* arg)
           flight_control_command.command = FLIGHTCONTROL_COMMAND_DIRECT;
           flight_control_command.direct.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value;
           flight_control_command.direct.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value;
-          flight_control_command.direct.yaw = 0;
+          flight_control_command.direct.yaw = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
           flight_control_command.direct.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
           break;
 
@@ -285,7 +287,7 @@ static void FlightControlTask(void* arg)
           flight_control_command.command = FLIGHTCONTROL_COMMAND_RATE;
           flight_control_command.rate.pitch_rate = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value * PITCH_RATE_STICK_SCALER;
           flight_control_command.rate.roll_rate = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_RATE_STICK_SCALER;
-          flight_control_command.rate.yaw_rate = 0;
+          flight_control_command.rate.yaw_rate = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
           flight_control_command.rate.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
           break;
 
@@ -293,7 +295,7 @@ static void FlightControlTask(void* arg)
           flight_control_command.command = FLIGHTCONTROL_COMMAND_ATTITUDE;
           flight_control_command.attitude.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value * PITCH_ATTITUDE_STICK_SCALER;
           flight_control_command.attitude.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_ATTITUDE_STICK_SCALER;;
-          flight_control_command.attitude.yaw = 0;
+          flight_control_command.attitude.yaw = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
           flight_control_command.attitude.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
           break;
       }
@@ -319,7 +321,7 @@ static void FlightControlTask(void* arg)
 
       // Rate based (degrees per second)
       case FLIGHTCONTROL_COMMAND_RATE:
-        control_outputs.yaw = 0;
+        control_outputs.yaw = flight_control_command.rate.yaw_rate;
         control_outputs.pitch = Pid_Calculate(&pitch_rate_pid, flight_control_command.rate.pitch_rate, imu_ahrs_status.pitch_rate);
         control_outputs.roll = Pid_Calculate(&roll_rate_pid, flight_control_command.rate.roll_rate, imu_ahrs_status.roll_rate);
         control_outputs.throttle = flight_control_command.rate.throttle;
@@ -368,9 +370,10 @@ static void CommitActuators(const FlightControlOutput_t* controls)
 {
   float actuators[SERVO_ACTUATOR_COUNT];
 
-  actuators[SERVO_ACTUATOR_OUTPUT_LEFT_ELEVON] = -controls->pitch - controls->roll;
-  actuators[SERVO_ACTUATOR_OUTPUT_RIGHT_ELEVON] = -controls->pitch + controls->roll;
   actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE] = controls->throttle;
+  actuators[SERVO_ACTUATOR_OUTPUT_AILERON] = controls->roll;
+  actuators[SERVO_ACTUATOR_OUTPUT_ELEVATOR] = controls->pitch;
+  actuators[SERVO_ACTUATOR_OUTPUT_RUDDER] = controls->yaw;
 
   ServoActuatorTranslate((float*)&actuators, (ServoActuatorTranslation_t*)&servo_accuator_translations, SERVO_ACTUATOR_COUNT);
 }
