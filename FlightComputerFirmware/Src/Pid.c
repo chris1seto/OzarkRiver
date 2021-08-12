@@ -8,7 +8,7 @@
 void Pid_Reset(Pid_t* const inst)
 {
   inst->integrator = 0;
-  inst->last_error = 0;
+  inst->last_process = 0;
   inst->last_run_time = 0;
 }
 
@@ -43,6 +43,11 @@ float Pid_Calculate(Pid_t* const inst, const float setpoint, const float process
 
   // Calculate dT in mS
   dt_correction = (Ticks_Diff(Ticks_Now(), inst->last_run_time) / inst->loop_period);
+  
+  if (dt_correction > inst->max_loop_period_factor)
+  {
+    dt_correction = 1;
+  }
 
   // Error
   error = (setpoint - process);
@@ -62,8 +67,8 @@ float Pid_Calculate(Pid_t* const inst, const float setpoint, const float process
   i = (inst->ki * inst->integrator);
 
   // Derivative
-  d = inst->kd * ((error - inst->last_error) / dt_correction);
-  inst->last_error = error;
+  d = inst->kd * ((process - inst->last_process) / dt_correction);
+  inst->last_process = process;
 
   // Sum terms
   output = p + i + d;

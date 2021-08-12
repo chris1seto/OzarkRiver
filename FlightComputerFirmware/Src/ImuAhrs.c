@@ -249,13 +249,13 @@ void ImuAhrs_Init(void)
 
 static bool is_converged = false;
 
-  
+
 
 static void Calibrate(const Imu_t* raw_imu_data)
 {
   uint32_t i;
   bool axes_in_range;
-  
+
   // Simple mechanism to calibrate gyro drift offset
   if (!is_calibrated)
   {
@@ -305,9 +305,9 @@ static void Calibrate(const Imu_t* raw_imu_data)
 static void ImuAhrsTask(void* arg)
 {
   uint32_t i;
-  
+
   Imu_t raw_imu_data;
-  
+
   FusionVector3 uncalibrated_gyro;
   FusionVector3 uncalibrated_accel;
   FusionVector3 uncalibrated_mag;
@@ -335,7 +335,7 @@ static void ImuAhrsTask(void* arg)
     if (!is_calibrated)
     {
       Calibrate(&raw_imu_data);
-      
+
       // Load status
       imu_ahrs_status.timestamp = Ticks_Now();
       imu_ahrs_status.flags = flags;
@@ -349,7 +349,7 @@ static void ImuAhrsTask(void* arg)
       xQueueOverwrite(imu_ahrs_status_queue, &imu_ahrs_status);
 
       vTaskDelay(IMUAHRS_PERIOD);
-      
+
       continue;
     }
 
@@ -384,8 +384,8 @@ static void ImuAhrsTask(void* arg)
     // Load status
     imu_ahrs_status.timestamp = Ticks_Now();
     imu_ahrs_status.flags = flags;
-    imu_ahrs_status.pitch = euler_angles.angle.pitch;
-    imu_ahrs_status.roll = -euler_angles.angle.roll;
+    imu_ahrs_status.pitch = -euler_angles.angle.pitch;
+    imu_ahrs_status.roll = euler_angles.angle.roll;
     imu_ahrs_status.yaw = -euler_angles.angle.yaw;
     imu_ahrs_status.pitch_rate = calibrated_gyro.axis.y;
     imu_ahrs_status.roll_rate = calibrated_gyro.axis.x;

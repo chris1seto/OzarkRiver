@@ -21,7 +21,7 @@ void Retarget_Init(void)
 	
 	// Configure the USART peripheral
 	uart_handle.Instance          = USART1;
-	uart_handle.Init.BaudRate     = 230400;
+	uart_handle.Init.BaudRate     = 1000000;
 	uart_handle.Init.WordLength   = UART_WORDLENGTH_8B;
 	uart_handle.Init.StopBits     = UART_STOPBITS_1;
 	uart_handle.Init.Parity       = UART_PARITY_NONE;

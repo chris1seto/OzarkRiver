@@ -54,14 +54,14 @@ void ServoOut_Init(void)
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   // OUT5
-  /*GPIO_InitStruct.Pin       = GPIO_PIN_8;
-  GPIO_InitStruct.Alternate = GPIO_AF10_TIM4;
+  GPIO_InitStruct.Pin       = GPIO_PIN_8;
+  GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   // OUT6
   GPIO_InitStruct.Pin       = GPIO_PIN_9;
-  GPIO_InitStruct.Alternate = GPIO_AF10_TIM4;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);*/
+  GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   // Block 1..2 : TIM3
   // PA6 : TIM3_CH1 : OUT1

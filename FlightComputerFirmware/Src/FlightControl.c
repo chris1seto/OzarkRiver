@@ -47,6 +47,7 @@ typedef struct
   float roll;
   float yaw;
   float throttle;
+  float flap;
 } FlightControlCommandDirect_t;
 
 typedef struct
@@ -55,6 +56,7 @@ typedef struct
   float roll_rate;
   float yaw_rate;
   float throttle;
+  float flap;
 } FlightControlCommandRate_t;
 
 typedef struct
@@ -63,6 +65,7 @@ typedef struct
   float roll;
   float yaw;
   float throttle;
+  float flap;
 } FlightControlCommandAttitude_t;
 
 typedef struct
@@ -91,6 +94,7 @@ enum RC_INPUT_CHANNEL
   RC_INPUT_CHANNEL_ELEVATOR = 2,
   RC_INPUT_CHANNEL_RUDDER = 3,
   RC_INPUT_CHANNEL_MODE = 4,
+  RC_INPUT_CHANNEL_FLAPS = 5,
 };
 
 #define RC_INPUT_CHANNEL_COUNT 5
@@ -99,8 +103,9 @@ enum SERVO_ACTUATOR_OUTPUT
 {
   SERVO_ACTUATOR_OUTPUT_THROTTLE = 0,
   SERVO_ACTUATOR_OUTPUT_ELEVATOR = 1,
-  SERVO_ACTUATOR_OUTPUT_AILERON = 2,
-  SERVO_ACTUATOR_OUTPUT_RUDDER = 3,
+  SERVO_ACTUATOR_OUTPUT_RUDDER = 2,
+  SERVO_ACTUATOR_OUTPUT_AILERON_LEFT = 3,
+  SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT = 4,
 };
 
 typedef struct
@@ -111,13 +116,16 @@ typedef struct
   enum SERVOOUT_CHANNEL target;
 } ServoActuatorTranslation_t;
 
-#define SERVO_ACTUATOR_COUNT 4
+#define SERVO_ACTUATOR_COUNT 5
 static const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
 {
-  [SERVO_ACTUATOR_OUTPUT_THROTTLE]  = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_1},
-  [SERVO_ACTUATOR_OUTPUT_AILERON]   = {0.85f, 1.65f, 2.15f, SERVOOUT_CHANNEL_2},
-  [SERVO_ACTUATOR_OUTPUT_ELEVATOR]  = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_3},
-  [SERVO_ACTUATOR_OUTPUT_RUDDER]    = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_4},
+  [SERVO_ACTUATOR_OUTPUT_THROTTLE]        = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_1},
+  [SERVO_ACTUATOR_OUTPUT_ELEVATOR]        = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_2},
+  [SERVO_ACTUATOR_OUTPUT_RUDDER]          = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_3},
+  //                                          D       C      U
+  [SERVO_ACTUATOR_OUTPUT_AILERON_LEFT]    = {0.85f, 1.65f, 2.40f, SERVOOUT_CHANNEL_4},
+  //                                          U       C      D
+  [SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT]   = {2.60f, 1.65f, 1.00f, SERVOOUT_CHANNEL_5},
 };
 
 typedef struct
@@ -126,6 +134,7 @@ typedef struct
   float roll;
   float yaw;
   float throttle;
+  float flap;
 } FlightControlOutput_t;
 
 #define PITCH_RATE_STICK_SCALER .35f
@@ -133,6 +142,10 @@ typedef struct
 
 #define PITCH_ATTITUDE_STICK_SCALER (90.0f / CONTROL_MAX)
 #define ROLL_ATTITUDE_STICK_SCALER (90.0f / CONTROL_MAX)
+
+#define RATE_INTEGRATOR_MAX 250
+
+#define FLAP_SCALER .5f
 
 static enum FLIGHTCONTROL_COMMAND last_flight_control_command = FLIGHTCONTROL_COMMAND_NONE;
 
@@ -151,17 +164,20 @@ void FlightControl_Init(void)
   Pid_SetOutputLimit(&pitch_rate_pid, CONTROL_MIN, CONTROL_MAX);
   Pid_SetOutputLimit(&roll_rate_pid, CONTROL_MIN, CONTROL_MAX);
 
-  Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.8, 0, 0);
-  Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 2.5, 0, 0);
+  Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, 0);
+  Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.6, .5, 0);
+
+  Pid_SetIntegratorError(&pitch_rate_pid, -RATE_INTEGRATOR_MAX, RATE_INTEGRATOR_MAX);
+  Pid_SetIntegratorError(&roll_rate_pid, -RATE_INTEGRATOR_MAX, RATE_INTEGRATOR_MAX);
 
   // Configure attitude PID
-  Pid_SetOutputLimit(&pitch_attitude_pid, CONTROL_MIN, CONTROL_MAX);
-  Pid_SetOutputLimit(&roll_attitude_pid, CONTROL_MIN, CONTROL_MAX);
+  Pid_SetOutputLimit(&pitch_attitude_pid, -PITCH_RATE_MAX, PITCH_RATE_MAX);
+  Pid_SetOutputLimit(&roll_attitude_pid, -ROLL_RATE_MAX, ROLL_RATE_MAX);
 
-  Pid_SetTuning(&pitch_attitude_pid, FLIGHTCONTROL_PERIOD, 2.8, 0, 0);
-  Pid_SetTuning(&roll_attitude_pid, FLIGHTCONTROL_PERIOD, 2.5, 0, 0);
+  Pid_SetTuning(&pitch_attitude_pid, FLIGHTCONTROL_PERIOD, 1.9, 0, 0);
+  Pid_SetTuning(&roll_attitude_pid, FLIGHTCONTROL_PERIOD, 2.0, 0, 0);
 
-  xTaskCreate(FlightControlTask, TAG, 512, NULL, 0, NULL);
+  xTaskCreate(FlightControlTask, TAG, 600, NULL, 0, NULL);
 }
 
 static bool SpektrumChannelValid(const SpektrumRcInChannel_t* channel)
@@ -189,6 +205,12 @@ static void ComputeAttitude(FlightControlOutput_t* const control_outputs, const 
   // Compute rate correction
   pitch_rate_correction = Pid_Calculate(&pitch_rate_pid, pitch_rate_setpoint, imu_ahrs_status->pitch_rate);
   roll_rate_correction = Pid_Calculate(&roll_rate_pid, roll_rate_setpoint, imu_ahrs_status->roll_rate);
+
+  /*printf("att (%+.2f %+.2f)  rat (%+.2f %+.2f)  setpoint (%+.2f %+.2f) out(%+.2f %+.2f)\r\n",
+    imu_ahrs_status->pitch, imu_ahrs_status->roll,
+    imu_ahrs_status->pitch_rate, imu_ahrs_status->roll_rate,
+    pitch_rate_setpoint, roll_rate_setpoint,
+    pitch_rate_correction, roll_rate_correction);*/
 
   control_outputs->yaw = 0;
   control_outputs->pitch = pitch_rate_correction;
@@ -281,6 +303,7 @@ static void FlightControlTask(void* arg)
           flight_control_command.direct.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value;
           flight_control_command.direct.yaw = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
           flight_control_command.direct.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+          flight_control_command.direct.flap = spektrum_status.channels[RC_INPUT_CHANNEL_FLAPS].value;
           break;
 
         case FLIGHTCONTROL_MODE_RATE:
@@ -289,6 +312,7 @@ static void FlightControlTask(void* arg)
           flight_control_command.rate.roll_rate = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_RATE_STICK_SCALER;
           flight_control_command.rate.yaw_rate = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
           flight_control_command.rate.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+          flight_control_command.rate.flap = spektrum_status.channels[RC_INPUT_CHANNEL_FLAPS].value;
           break;
 
         case FLIGHTCONTROL_MODE_ATTITUDE:
@@ -297,6 +321,7 @@ static void FlightControlTask(void* arg)
           flight_control_command.attitude.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_ATTITUDE_STICK_SCALER;;
           flight_control_command.attitude.yaw = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
           flight_control_command.attitude.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
+          flight_control_command.attitude.flap = spektrum_status.channels[RC_INPUT_CHANNEL_FLAPS].value;
           break;
       }
     }
@@ -316,6 +341,7 @@ static void FlightControlTask(void* arg)
         control_outputs.pitch = flight_control_command.direct.pitch;
         control_outputs.roll = flight_control_command.direct.roll;
         control_outputs.throttle = flight_control_command.direct.throttle;
+        control_outputs.flap = flight_control_command.direct.flap * FLAP_SCALER;
         last_flight_control_command = FLIGHTCONTROL_COMMAND_DIRECT;
         break;
 
@@ -325,11 +351,13 @@ static void FlightControlTask(void* arg)
         control_outputs.pitch = Pid_Calculate(&pitch_rate_pid, flight_control_command.rate.pitch_rate, imu_ahrs_status.pitch_rate);
         control_outputs.roll = Pid_Calculate(&roll_rate_pid, flight_control_command.rate.roll_rate, imu_ahrs_status.roll_rate);
         control_outputs.throttle = flight_control_command.rate.throttle;
+        control_outputs.flap = flight_control_command.rate.flap * FLAP_SCALER;
         last_flight_control_command = FLIGHTCONTROL_COMMAND_RATE;
         break;
 
       case FLIGHTCONTROL_COMMAND_ATTITUDE:
         ComputeAttitude(&control_outputs, &imu_ahrs_status, &flight_control_command.attitude);
+        control_outputs.flap = 0;
         last_flight_control_command = FLIGHTCONTROL_COMMAND_ATTITUDE;
         break;
 
@@ -371,9 +399,10 @@ static void CommitActuators(const FlightControlOutput_t* controls)
   float actuators[SERVO_ACTUATOR_COUNT];
 
   actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE] = controls->throttle;
-  actuators[SERVO_ACTUATOR_OUTPUT_AILERON] = controls->roll;
   actuators[SERVO_ACTUATOR_OUTPUT_ELEVATOR] = controls->pitch;
   actuators[SERVO_ACTUATOR_OUTPUT_RUDDER] = controls->yaw;
+  actuators[SERVO_ACTUATOR_OUTPUT_AILERON_LEFT] = controls->roll + controls->flap;
+  actuators[SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT] = -controls->roll + controls->flap;
 
   ServoActuatorTranslate((float*)&actuators, (ServoActuatorTranslation_t*)&servo_accuator_translations, SERVO_ACTUATOR_COUNT);
 }

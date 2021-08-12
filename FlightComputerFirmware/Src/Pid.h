@@ -16,10 +16,11 @@ typedef struct
   float integrator_limit_max;
   float output_limit_min;
   float output_limit_max;
-  float last_error;
+  float last_process;
   float integrator;
   TickType_t last_run_time;
   TickType_t loop_period;
+  float max_loop_period_factor;
 } Pid_t;
 
 void Pid_Reset(Pid_t* const inst);
