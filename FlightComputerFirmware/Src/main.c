@@ -5,7 +5,7 @@
 #include "task.h"
 #include "Retarget.h"
 #include "Leds.h"
-#include "SpektrumRcIn.h"
+#include "Crsf.h"
 #include "ServoOut.h"
 #include "FlightControl.h"
 #include "Watchdog.h"
@@ -48,8 +48,8 @@ int main(void)
   // Init I2c1
   I2c1_Init();
 
-  // Init Spektrum
-  SpectrumRcIn_Init();
+  // Init Crsf
+  Crsf_Init();
 
   // Init ServoOut
   ServoOut_Init();

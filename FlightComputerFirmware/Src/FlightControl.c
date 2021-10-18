@@ -3,9 +3,10 @@
 #include <stm32f3xx_hal.h>
 #include "FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
 #include "Retarget.h"
 #include "Leds.h"
-#include "SpektrumRcIn.h"
+#include "Crsf.h"
 #include "ServoOut.h"
 #include "Bits.h"
 #include "MathX.h"
@@ -83,7 +84,7 @@ typedef struct
 
 enum FLIGHTCONTROL_FAULT
 {
-  FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID = (1 << 0),
+  FLIGHTCONTROL_FAULT_RCIN_INVALID = (1 << 0),
   FLIGHTCONTROL_FAULT_IMUAHRS_INVALID = (1 << 1),
 };
 
@@ -149,7 +150,6 @@ typedef struct
 
 static enum FLIGHTCONTROL_COMMAND last_flight_control_command = FLIGHTCONTROL_COMMAND_NONE;
 
-static bool SpektrumChannelValid(const SpektrumRcInChannel_t* channel);
 static void ServoActuatorTranslate(const float* input, const ServoActuatorTranslation_t* translation, const uint32_t translation_count);
 static void CommitActuators(const FlightControlOutput_t* controls);
 static void FlightControlTask(void* arg);
@@ -165,7 +165,7 @@ void FlightControl_Init(void)
   Pid_SetOutputLimit(&roll_rate_pid, CONTROL_MIN, CONTROL_MAX);
 
   Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, 0);
-  Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.6, .5, 0);
+  Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.5, .25, 0);
 
   Pid_SetIntegratorError(&pitch_rate_pid, -RATE_INTEGRATOR_MAX, RATE_INTEGRATOR_MAX);
   Pid_SetIntegratorError(&roll_rate_pid, -RATE_INTEGRATOR_MAX, RATE_INTEGRATOR_MAX);
@@ -178,16 +178,6 @@ void FlightControl_Init(void)
   Pid_SetTuning(&roll_attitude_pid, FLIGHTCONTROL_PERIOD, 2.0, 0, 0);
 
   xTaskCreate(FlightControlTask, TAG, 600, NULL, 0, NULL);
-}
-
-static bool SpektrumChannelValid(const SpektrumRcInChannel_t* channel)
-{
-  if (!channel->valid || Ticks_IsExpired(channel->timestamp, 100))
-  {
-    return false;
-  }
-
-  return true;
 }
 
 static void ComputeAttitude(FlightControlOutput_t* const control_outputs, const ImuAhrsStatus_t* imu_ahrs_status, const FlightControlCommandAttitude_t* command)
@@ -220,12 +210,17 @@ static void ComputeAttitude(FlightControlOutput_t* const control_outputs, const 
 
 static void FlightControlTask(void* arg)
 {
-  SpektrumRcInStatus_t spektrum_status = {0};
+  CrsfStatus_t crsf_status = {0};
   FlightControlOutput_t control_outputs = {0};
   ImuAhrsStatus_t imu_ahrs_status = {0};
   uint32_t faults;
   enum FLIGHTCONTROL_MODE tx_flight_control_mode;
   FlightControlCommand_t flight_control_command;
+  
+  while (true)
+  {
+    vTaskDelay(FLIGHTCONTROL_PERIOD);
+  }
 
   while (true)
   {
@@ -248,29 +243,25 @@ static void FlightControlTask(void* arg)
       }
     }
 
-    // Get Spektrum status
-    if (!SpectrumRcIn_GetStatus(&spektrum_status))
+    // Get Crsf status
+    if (!Crsf_GetStatus(&crsf_status))
     {
-      Bits_Set(&faults, FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID);
+      Bits_Set(&faults, FLIGHTCONTROL_FAULT_RCIN_INVALID);
     }
     else
     {
-      if (!SpektrumChannelValid(&spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE])
-        || !SpektrumChannelValid(&spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER])
-        || !SpektrumChannelValid(&spektrum_status.channels[RC_INPUT_CHANNEL_AILERON])
-        || !SpektrumChannelValid(&spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR])
-        || !SpektrumChannelValid(&spektrum_status.channels[RC_INPUT_CHANNEL_MODE]))
+      if (Ticks_IsExpired(crsf_status.channel_data.timestamp, 1000))
       {
-        Bits_Set(&faults, FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID);
+        Bits_Set(&faults, FLIGHTCONTROL_FAULT_RCIN_INVALID);
       }
     }
 
     // Select flight mode
-    if (spektrum_status.channels[RC_INPUT_CHANNEL_MODE].value > 500)
+    if (crsf_status.channel_data.channels[RC_INPUT_CHANNEL_MODE] > 500)
     {
       tx_flight_control_mode = FLIGHTCONTROL_MODE_ATTITUDE;
     }
-    else if (spektrum_status.channels[RC_INPUT_CHANNEL_MODE].value > -500)
+    else if (crsf_status.channel_data.channels[RC_INPUT_CHANNEL_MODE] > -500)
     {
       tx_flight_control_mode = FLIGHTCONTROL_MODE_RATE;
     }
@@ -280,7 +271,7 @@ static void FlightControlTask(void* arg)
     }
 
     // Check if we have TX input
-    if (Bits_IsSet(faults, FLIGHTCONTROL_FAULT_SPEKTRUM_INVALID))
+    if (Bits_IsSet(faults, FLIGHTCONTROL_FAULT_RCIN_INVALID))
     {
       flight_control_command.command = FLIGHTCONTROL_COMMAND_DIRECT;
       flight_control_command.direct.pitch = 0;
@@ -299,29 +290,29 @@ static void FlightControlTask(void* arg)
       {
         case FLIGHTCONTROL_MODE_DIRECT:
           flight_control_command.command = FLIGHTCONTROL_COMMAND_DIRECT;
-          flight_control_command.direct.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value;
-          flight_control_command.direct.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value;
-          flight_control_command.direct.yaw = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
-          flight_control_command.direct.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
-          flight_control_command.direct.flap = spektrum_status.channels[RC_INPUT_CHANNEL_FLAPS].value;
+          flight_control_command.direct.pitch = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_ELEVATOR];
+          flight_control_command.direct.roll = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_AILERON];
+          flight_control_command.direct.yaw = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_RUDDER];
+          flight_control_command.direct.throttle = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_THROTTLE];
+          flight_control_command.direct.flap = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_FLAPS];
           break;
 
         case FLIGHTCONTROL_MODE_RATE:
           flight_control_command.command = FLIGHTCONTROL_COMMAND_RATE;
-          flight_control_command.rate.pitch_rate = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value * PITCH_RATE_STICK_SCALER;
-          flight_control_command.rate.roll_rate = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_RATE_STICK_SCALER;
-          flight_control_command.rate.yaw_rate = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
-          flight_control_command.rate.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
-          flight_control_command.rate.flap = spektrum_status.channels[RC_INPUT_CHANNEL_FLAPS].value;
+          flight_control_command.rate.pitch_rate = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_ELEVATOR] * PITCH_RATE_STICK_SCALER;
+          flight_control_command.rate.roll_rate = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_AILERON] * ROLL_RATE_STICK_SCALER;
+          flight_control_command.rate.yaw_rate = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_RUDDER];
+          flight_control_command.rate.throttle = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_THROTTLE];
+          flight_control_command.rate.flap = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_FLAPS];
           break;
 
         case FLIGHTCONTROL_MODE_ATTITUDE:
           flight_control_command.command = FLIGHTCONTROL_COMMAND_ATTITUDE;
-          flight_control_command.attitude.pitch = spektrum_status.channels[RC_INPUT_CHANNEL_ELEVATOR].value * PITCH_ATTITUDE_STICK_SCALER;
-          flight_control_command.attitude.roll = spektrum_status.channels[RC_INPUT_CHANNEL_AILERON].value * ROLL_ATTITUDE_STICK_SCALER;;
-          flight_control_command.attitude.yaw = spektrum_status.channels[RC_INPUT_CHANNEL_RUDDER].value;
-          flight_control_command.attitude.throttle = spektrum_status.channels[RC_INPUT_CHANNEL_THROTTLE].value;
-          flight_control_command.attitude.flap = spektrum_status.channels[RC_INPUT_CHANNEL_FLAPS].value;
+          flight_control_command.attitude.pitch = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_ELEVATOR] * PITCH_ATTITUDE_STICK_SCALER;
+          flight_control_command.attitude.roll = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_AILERON] * ROLL_ATTITUDE_STICK_SCALER;;
+          flight_control_command.attitude.yaw = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_RUDDER];
+          flight_control_command.attitude.throttle = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_THROTTLE];
+          flight_control_command.attitude.flap = crsf_status.channel_data.channels[RC_INPUT_CHANNEL_FLAPS];
           break;
       }
     }

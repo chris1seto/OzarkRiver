@@ -111,7 +111,7 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
 
   // Configure the USART peripheral
   uart_handle.Instance          = USART3;
-  uart_handle.Init.BaudRate     = 115200;
+  uart_handle.Init.BaudRate     = 420000;
   uart_handle.Init.WordLength   = UART_WORDLENGTH_8B;
   uart_handle.Init.StopBits     = UART_STOPBITS_1;
   uart_handle.Init.Parity       = UART_PARITY_NONE;
