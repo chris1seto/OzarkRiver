@@ -157,6 +157,7 @@ static void FlightControlTask(void* arg);
 static const char* TAG = "FLIGHTCONTROL";
 
 #define FLIGHTCONTROL_PERIOD   (10 / portTICK_PERIOD_MS)
+#define RCINPUT_TIMEOUT   (250 / portTICK_PERIOD_MS)
 
 void FlightControl_Init(void)
 {
@@ -216,11 +217,6 @@ static void FlightControlTask(void* arg)
   uint32_t faults;
   enum FLIGHTCONTROL_MODE tx_flight_control_mode;
   FlightControlCommand_t flight_control_command;
-  
-  while (true)
-  {
-    vTaskDelay(FLIGHTCONTROL_PERIOD);
-  }
 
   while (true)
   {
@@ -250,7 +246,7 @@ static void FlightControlTask(void* arg)
     }
     else
     {
-      if (Ticks_IsExpired(crsf_status.channel_data.timestamp, 1000))
+      if (Ticks_IsExpired(crsf_status.channel_data.timestamp, RCINPUT_TIMEOUT))
       {
         Bits_Set(&faults, FLIGHTCONTROL_FAULT_RCIN_INVALID);
       }

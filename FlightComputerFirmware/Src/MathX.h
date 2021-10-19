@@ -5,6 +5,7 @@
 #include <math.h>
 
 float MathX_ConstrainF(const float x, const float min, const float max);
+int32_t MathX_Constrain(const int32_t x, const int32_t min, const int32_t max);
 float MathX_MapF(const float x, const float in_min, const float in_max, const float out_min, const float out_max);
 float MathX_Magnitude3DF(const float x, const float y, const float z);
 

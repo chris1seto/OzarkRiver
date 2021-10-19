@@ -4,6 +4,20 @@
 #include <math.h>
 #include "MathX.h"
 
+int32_t MathX_Constrain(const int32_t x, const int32_t min, const int32_t max)
+{
+  if (x < min)
+  {
+    return min;
+  }
+  else if (x > max)
+  {
+    return max;
+  }
+  
+  return x;
+}
+
 float MathX_ConstrainF(const float x, const float min, const float max)
 {
   if (x < min)
