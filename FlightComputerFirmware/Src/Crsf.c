@@ -12,9 +12,6 @@
 #include "MathX.h"
 
 #define CRSF_CHANNEL_VALUE_MIN  172
-#define CRSF_CHANNEL_VALUE_1000 191
-#define CRSF_CHANNEL_VALUE_MID  992
-#define CRSF_CHANNEL_VALUE_2000 1792
 #define CRSF_CHANNEL_VALUE_MAX  1811
 #define CRSF_CHANNEL_VALUE_SPAN (CRSF_CHANNEL_VALUE_MAX - CRSF_CHANNEL_VALUE_MIN)
 #define CRSF_MAX_PACKET_LEN 64
@@ -68,26 +65,6 @@ enum CRSF_ADDRESS
   CRSF_ADDRESS_CRSF_RECEIVER = 0xEC,
   CRSF_ADDRESS_CRSF_TRANSMITTER = 0xEE,
 };
-
-typedef struct
-{
-  uint16_t ch0 : 11;
-  uint16_t ch1 : 11;
-  uint16_t ch2 : 11;
-  uint16_t ch3 : 11;
-  uint16_t ch4 : 11;
-  uint16_t ch5 : 11;
-  uint16_t ch6 : 11;
-  uint16_t ch7 : 11;
-  uint16_t ch8 : 11;
-  uint16_t ch9 : 11;
-  uint16_t ch10 : 11;
-  uint16_t ch11 : 11;
-  uint16_t ch12 : 11;
-  uint16_t ch13 : 11;
-  uint16_t ch14 : 11;
-  uint16_t ch15 : 11;
-} __attribute__((packed)) CrsfChannelsPacked_t;
 
 static uint8_t crc8_lut[256];
 
@@ -143,7 +120,6 @@ static uint8_t Crc8Calc(const uint8_t *data, uint8_t size);
 static void ParseCrsfPackets(void);
 static void CrsfTask(void* arg);
 static CsrfPacketDescriptor_t* FindCrsfDescriptor(const enum CRSF_PACKET_TYPE packet_type);
-
 
 static const char* TAG = "CSRF";
 

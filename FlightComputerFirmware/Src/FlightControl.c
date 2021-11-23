@@ -94,11 +94,12 @@ enum RC_INPUT_CHANNEL
   RC_INPUT_CHANNEL_AILERON = 1,
   RC_INPUT_CHANNEL_ELEVATOR = 2,
   RC_INPUT_CHANNEL_RUDDER = 3,
-  RC_INPUT_CHANNEL_MODE = 4,
-  RC_INPUT_CHANNEL_FLAPS = 5,
+  RC_INPUT_CHANNEL_ARM = 4,
+  RC_INPUT_CHANNEL_MODE = 5,
+  RC_INPUT_CHANNEL_FLAPS = 6,
 };
 
-#define RC_INPUT_CHANNEL_COUNT 5
+#define RC_INPUT_CHANNEL_COUNT 6
 
 enum SERVO_ACTUATOR_OUTPUT
 {
@@ -138,7 +139,7 @@ typedef struct
   float flap;
 } FlightControlOutput_t;
 
-#define PITCH_RATE_STICK_SCALER .35f
+#define PITCH_RATE_STICK_SCALER .45f
 #define ROLL_RATE_STICK_SCALER  .5f
 
 #define PITCH_ATTITUDE_STICK_SCALER (90.0f / CONTROL_MAX)
@@ -255,7 +256,7 @@ static void FlightControlTask(void* arg)
     // Select flight mode
     if (crsf_status.channel_data.channels[RC_INPUT_CHANNEL_MODE] > 500)
     {
-      tx_flight_control_mode = FLIGHTCONTROL_MODE_ATTITUDE;
+      tx_flight_control_mode = FLIGHTCONTROL_MODE_RATE;
     }
     else if (crsf_status.channel_data.channels[RC_INPUT_CHANNEL_MODE] > -500)
     {
