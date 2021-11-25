@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <stm32f3xx_hal.h>
+#include <stm32f4xx_hal.h>
 
 static UART_HandleTypeDef uart_handle;
 

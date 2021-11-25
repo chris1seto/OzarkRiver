@@ -1,5 +1,3 @@
-// Copyright 2019 Bossa Nova Robotics, proprietary unpublished source code
-
 #ifndef LOG_H
 #define LOG_H
 

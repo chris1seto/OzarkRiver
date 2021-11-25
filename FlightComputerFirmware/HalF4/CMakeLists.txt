@@ -1,0 +1,5 @@
+file(GLOB_RECURSE HAL_SOURCES "Src/*.c")
+add_library(HalF4 STATIC ${HAL_SOURCES})
+target_include_directories(HalF4 PUBLIC "${CMAKE_CURRENT_LIST_DIR}/Inc")
+target_link_libraries(HalF4 Cmsis)
+target_link_libraries(HalF4 Platform)

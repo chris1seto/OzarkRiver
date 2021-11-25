@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-#include <stm32f3xx_hal.h>
+#include <stm32f4xx_hal.h>
 #include "ServoOut.h"
 
 static TIM_HandleTypeDef tim3_handle;
@@ -17,6 +17,19 @@ static TIM_HandleTypeDef tim4_handle;
 #define TIM_4_PERIOD      65445
 #define TIM_4_MS_TO_TICKS(x) (uint16_t)(x * 3272.25 * 2)
 
+/*
+    DEF_TIM(TIM4,  CH2, PB7,  TIM_USE_MC_MOTOR  | TIM_USE_FW_MOTOR,   1, 0), // S1 D(1,3,2)
+    DEF_TIM(TIM4,  CH1, PB6,  TIM_USE_MC_MOTOR  | TIM_USE_FW_MOTOR,   1, 0), // S2 D(1,0,2)
+
+    DEF_TIM(TIM3,  CH3, PB0,  TIM_USE_MC_MOTOR  | TIM_USE_FW_SERVO,   1, 0), // S3 D(1,7,5)
+    DEF_TIM(TIM3,  CH4, PB1,  TIM_USE_MC_MOTOR  | TIM_USE_FW_SERVO,   1, 0), // S4 D(1,2,5)
+    DEF_TIM(TIM8,  CH3, PC8,  TIM_USE_MC_MOTOR  | TIM_USE_FW_SERVO,   1, 0), // S5 D(2,4,7)
+    DEF_TIM(TIM8,  CH4, PC9,  TIM_USE_MC_MOTOR  | TIM_USE_FW_SERVO,   1, 0), // S6 D(2,7,7)
+    DEF_TIM(TIM12, CH1, PB14, TIM_USE_MC_SERVO  | TIM_USE_FW_SERVO,   1, 0), // S7
+    DEF_TIM(TIM12, CH2, PB15, TIM_USE_MC_SERVO  | TIM_USE_FW_SERVO,   1, 0), // S8
+    DEF_TIM(TIM1,  CH1, PA8,  TIM_USE_MC_SERVO  | TIM_USE_FW_SERVO,   1, 0), // S9
+*/
+
 void ServoOut_Init(void)
 {
   TIM_OC_InitTypeDef sConfig;
@@ -25,8 +38,10 @@ void ServoOut_Init(void)
 
   __HAL_RCC_TIM3_CLK_ENABLE();
   __HAL_RCC_TIM4_CLK_ENABLE();
+  __HAL_RCC_TIM8_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   // Configure GPIO
   GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
@@ -45,12 +60,12 @@ void ServoOut_Init(void)
 
   // OUT3
   GPIO_InitStruct.Pin       = GPIO_PIN_11;
-  GPIO_InitStruct.Alternate = GPIO_AF10_TIM4;
+  //GPIO_InitStruct.Alternate = GPIO_AF10_TIM4;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   // OUT4
   GPIO_InitStruct.Pin       = GPIO_PIN_12;
-  GPIO_InitStruct.Alternate = GPIO_AF10_TIM4;
+  //GPIO_InitStruct.Alternate = GPIO_AF10_TIM4;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   // OUT5

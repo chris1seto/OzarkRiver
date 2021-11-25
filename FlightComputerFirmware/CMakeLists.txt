@@ -9,7 +9,7 @@ SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections --specs=nosys.specs -T ${LINKER_SC
 
 add_definitions(-DUSE_FREERTOS -DUSE_HAL_DRIVER -DUSE_FULL_LL_DRIVER)
 add_compile_options(
-    -DSTM32F303xC
+    -DSTM32F405xx
     -fno-builtin
     -Wall
     -ffunction-sections
@@ -23,7 +23,7 @@ add_compile_options(
 
 set(CMAKE_C_STANDARD 99)
 
-add_subdirectory(HalF3)
+add_subdirectory(HalF4)
 add_subdirectory(FreeRTOS)
 add_subdirectory(Cmsis)
 add_subdirectory(Platform)
@@ -36,7 +36,7 @@ add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES})
 # Project includes
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC Src)
 
-target_link_libraries(${CMAKE_PROJECT_NAME} HalF3)
+target_link_libraries(${CMAKE_PROJECT_NAME} HalF4)
 target_link_libraries(${CMAKE_PROJECT_NAME} FreeRTOS)
 target_link_libraries(${CMAKE_PROJECT_NAME} Cmsis)
 target_link_libraries(${CMAKE_PROJECT_NAME} Platform)

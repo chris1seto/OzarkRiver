@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include <stm32f3xx_hal.h>
+#include <stm32f4xx_hal.h>
 #include "I2c1.h"
 
 static I2C_HandleTypeDef  i2c1_handle;
-
-#define I2C1_TIMING 0x00E0257A
 
 void I2c1_Init(void)
 {
@@ -29,26 +27,18 @@ void I2c1_Init(void)
   GPIO_InitStruct.Pin = GPIO_PIN_6;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  // What the fuck.
-  // https://electronics.stackexchange.com/questions/272427/stm32-busy-flag-is-set-after-i2c-initialization
-  __HAL_RCC_I2C1_FORCE_RESET();
-  HAL_Delay(2);
-  __HAL_RCC_I2C1_RELEASE_RESET();
-
   // Init I2C
   i2c1_handle.Instance = I2C1;
-  i2c1_handle.Init.Timing = I2C1_TIMING;
+  i2c1_handle.Init.ClockSpeed = 400000;
+  i2c1_handle.Init.DutyCycle = I2C_DUTYCYCLE_16_9;
   i2c1_handle.Init.OwnAddress1 = 0;
   i2c1_handle.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   i2c1_handle.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   i2c1_handle.Init.OwnAddress2 = 0;
-  i2c1_handle.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
   i2c1_handle.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   i2c1_handle.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
   HAL_I2C_Init(&i2c1_handle);
-  
-  HAL_I2CEx_ConfigAnalogFilter(&i2c1_handle, I2C_ANALOGFILTER_ENABLE);
-  //HAL_I2CEx_ConfigDigitalFilter(&i2c1_handle, 0);
+
 }
 
 bool I2c1_WriteMemory8(const uint8_t dev_addr, const uint8_t reg_addr, const uint8_t* data, const uint32_t size)

@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-#include <stm32f3xx_hal.h>
-#include <stm32f3xx_ll_dma.h>
-#include <stm32f3xx_ll_usart.h>
+#include <stm32f4xx_hal.h>
+#include <stm32f4xx_ll_dma.h>
+#include <stm32f4xx_ll_usart.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
@@ -97,7 +97,7 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
   */
 
   // DMA RX
-  dma_rx_handle.PeriphOrM2MSrcAddress = LL_USART_DMA_GetRegAddr(USART3, LL_USART_DMA_REG_DATA_RECEIVE);
+  //dma_rx_handle.PeriphOrM2MSrcAddress = LL_USART_DMA_GetRegAddr(USART3, LL_USART_DMA_REG_DATA_RECEIVE);
   dma_rx_handle.MemoryOrM2MDstAddress = (uint32_t)dma_rx_buffer;
   dma_rx_handle.Direction = LL_DMA_DIRECTION_PERIPH_TO_MEMORY;
   dma_rx_handle.Mode = LL_DMA_MODE_CIRCULAR;
@@ -117,9 +117,9 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
   uart_handle.Init.Parity       = UART_PARITY_NONE;
   uart_handle.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
   uart_handle.Init.OverSampling = UART_OVERSAMPLING_16;
-  uart_handle.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  //uart_handle.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   uart_handle.Init.Mode         = UART_MODE_RX;
-  uart_handle.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  //uart_handle.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
   HAL_UART_Init(&uart_handle);
 
@@ -134,11 +134,11 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
   __HAL_UART_CLEAR_PEFLAG(&uart_handle);
   __HAL_UART_CLEAR_NEFLAG(&uart_handle);
   __HAL_UART_CLEAR_OREFLAG(&uart_handle);
-  uart_handle.Instance->RQR |= USART_RQR_RXFRQ;
+  //uart_handle.Instance->RQR |= USART_RQR_RXFRQ;
 
   // Start RX
   LL_USART_EnableDMAReq_RX(USART3);
-  LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+  //LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
 
   xTaskCreate(Serial3Task, TAG, 500, NULL, 0, NULL);
 

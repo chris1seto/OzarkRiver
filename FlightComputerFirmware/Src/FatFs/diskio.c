@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stm32f3xx_hal.h>
+#include <stm32f4xx_hal.h>
 #include "ff.h"			/* Obtains integer types */
 #include "diskio.h"		/* Declarations of disk functions */
 #include "../Ticks.h"

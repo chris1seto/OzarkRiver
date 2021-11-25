@@ -3,7 +3,7 @@
 
 enum LED
 {
-  LED_RED = (1 << 0),
+  LED_GREEN = (1 << 0),
   LED_BLUE = (1 << 1),
 };
 

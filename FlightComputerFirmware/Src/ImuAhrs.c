@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <stm32f3xx_hal.h>
+#include <stm32f4xx_hal.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
