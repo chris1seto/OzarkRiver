@@ -5,48 +5,48 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "Ticks.h"
-#include "Spi2.h"
+#include "Spi3.h"
 
 static SPI_HandleTypeDef spi_handle;
 
-void Spi2_Init(void)
+void Spi3_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct;
 
   // Enable clocks
-  __HAL_RCC_SPI2_CLK_ENABLE();
+  __HAL_RCC_SPI3_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
-  // Init SPI2 GPIO
+  // Init SPI3 GPIO
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
 
-  // SPI2_MISO
-  GPIO_InitStruct.Pin = GPIO_PIN_2;
-  GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  // SPI3_MISO
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  // SPI2_MOSI
+  // SPI3_MOSI
+  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  GPIO_InitStruct.Alternate =  GPIO_AF6_SPI3;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  // SPI3_SCK
   GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Alternate =  GPIO_AF5_SPI2;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  // SPI2_SCK
-  GPIO_InitStruct.Pin = GPIO_PIN_13;
-  GPIO_InitStruct.Alternate =  GPIO_AF5_SPI2;
+  GPIO_InitStruct.Alternate =  GPIO_AF6_SPI3;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  // Target OSD
+  // Target SD
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Pin = GPIO_PIN_14;
   GPIO_InitStruct.Alternate =  0;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, true);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_14, true);
 
   // Init SPI
-  spi_handle.Instance               = SPI2;
+  spi_handle.Instance               = SPI3;
   spi_handle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   spi_handle.Init.Direction         = SPI_DIRECTION_2LINES;
   spi_handle.Init.CLKPhase          = SPI_PHASE_2EDGE;
@@ -61,27 +61,27 @@ void Spi2_Init(void)
   HAL_SPI_Init(&spi_handle);
 }
 
-static void SelectTarget(const enum SPI2_TARGET target)
+static void SelectTarget(const enum SPI3_TARGET target)
 {
   switch (target)
   {
-    case SPI2_TARGET_OSD:
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, false);
+    case SPI3_TARGET_SD:
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_14, false);
       break;
   }
 }
 
-static void DeSelectTarget(const enum SPI2_TARGET target)
+static void DeSelectTarget(const enum SPI3_TARGET target)
 {
   switch (target)
   {
-    case SPI2_TARGET_OSD:
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, true);
+    case SPI3_TARGET_SD:
+      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_14, true);
       break;
   }
 }
 
-bool Spi2_Transaction(const enum SPI2_TARGET target, const uint8_t* tx, uint8_t* const rx, const uint32_t size)
+bool Spi3_Transaction(const enum SPI3_TARGET target, const uint8_t* tx, uint8_t* const rx, const uint32_t size)
 {
   bool result;
 

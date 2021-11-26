@@ -42,14 +42,14 @@ int main(void)
   HAL_Delay(100);
 
   // Init LEDs
-  Leds_Init();
-  Leds_Off(LED_RED);
+  //Leds_Init();
+  //Leds_Off(LED_RED);
 
   // Init I2c1
   //I2c1_Init();
 
   // Init Crsf
-  Crsf_Init();
+  //Crsf_Init();
 
   // Init ServoOut
   //ServoOut_Init();
@@ -80,7 +80,7 @@ static void MainTask(void* args)
     Watchdog_Refresh();
 
     // Blink LED
-    Leds_Toggle(LED_RED, led_state);
+    //Leds_Toggle(LED_RED, led_state);
     led_state = !led_state;
 
     vTaskDelay(100);

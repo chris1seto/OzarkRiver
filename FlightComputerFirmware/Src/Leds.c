@@ -49,7 +49,7 @@ void Leds_Off(const uint32_t leds)
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_14, true);
   }
   
-  if (leds & LED_GREN)
+  if (leds & LED_GREEN)
   {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_13, true);
   }

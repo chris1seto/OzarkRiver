@@ -3,7 +3,7 @@
 
 enum SPI2_TARGET
 {
-  SPI2_TARGET_WINBOND,
+  SPI2_TARGET_OSD,
 };
 
 void Spi2_Init(void);
