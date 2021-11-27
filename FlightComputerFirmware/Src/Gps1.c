@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stm32f7xx_hal.h>
+#include <stm32f4xx_hal.h>
 #include "FreeRTOS.h"
 #include "task.h"
-#include "Spektrum.h"
-#include "BigEndian.h"
 #include "Ticks.h"
 #include "Nmea0183.h"
 #include "SerialInterface.h"

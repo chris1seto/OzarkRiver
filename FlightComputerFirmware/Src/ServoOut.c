@@ -47,8 +47,8 @@ void ServoOut_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct;
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
 
-  __HAL_RCC_TIM3_CLK_ENABLE();
   __HAL_RCC_TIM4_CLK_ENABLE();
+  __HAL_RCC_TIM3_CLK_ENABLE();
   __HAL_RCC_TIM8_CLK_ENABLE();
   __HAL_RCC_TIM12_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -112,8 +112,8 @@ void ServoOut_Init(void)
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
   HAL_TIM_ConfigClockSource(&tim3_handle, &sClockSourceConfig);
   
-  HAL_TIM_PWM_ConfigChannel(&tim4_handle, &sConfig, TIM_CHANNEL_1);
   HAL_TIM_PWM_ConfigChannel(&tim4_handle, &sConfig, TIM_CHANNEL_2);
+  HAL_TIM_PWM_ConfigChannel(&tim4_handle, &sConfig, TIM_CHANNEL_1);
 
   // Block 3..4 : TIM3
   tim4_handle.Instance = TIM4;
@@ -125,8 +125,8 @@ void ServoOut_Init(void)
   tim4_handle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   HAL_TIM_PWM_Init(&tim4_handle);
 
-  HAL_TIM_PWM_ConfigChannel(&tim3_handle, &sConfig, TIM_CHANNEL_1);
-  HAL_TIM_PWM_ConfigChannel(&tim3_handle, &sConfig, TIM_CHANNEL_2);
+  HAL_TIM_PWM_ConfigChannel(&tim3_handle, &sConfig, TIM_CHANNEL_3);
+  HAL_TIM_PWM_ConfigChannel(&tim3_handle, &sConfig, TIM_CHANNEL_4);
   
   // Block 5..6 : TIM8
   tim4_handle.Instance = TIM8;
@@ -148,22 +148,22 @@ void ServoOut_Set(const enum SERVOOUT_CHANNEL channel, const float value)
   {
     case SERVOOUT_CHANNEL_1:
       HAL_TIM_PWM_Start(&tim3_handle, TIM_CHANNEL_1);
-      __HAL_TIM_SET_COMPARE(&tim4_handle, TIM_CHANNEL_1, TIM_4_MS_TO_TICKS(value));
+      __HAL_TIM_SET_COMPARE(&tim4_handle, TIM_CHANNEL_2, TIM_4_MS_TO_TICKS(value));
       break;
 
     case SERVOOUT_CHANNEL_2:
       HAL_TIM_PWM_Start(&tim3_handle, TIM_CHANNEL_2);
-      __HAL_TIM_SET_COMPARE(&tim4_handle, TIM_CHANNEL_2, TIM_4_MS_TO_TICKS(value));
+      __HAL_TIM_SET_COMPARE(&tim4_handle, TIM_CHANNEL_1, TIM_4_MS_TO_TICKS(value));
       break;
 
     case SERVOOUT_CHANNEL_3:
       HAL_TIM_PWM_Start(&tim4_handle, TIM_CHANNEL_1);
-      __HAL_TIM_SET_COMPARE(&tim3_handle, TIM_CHANNEL_1, TIM_3_MS_TO_TICKS(value));
+      __HAL_TIM_SET_COMPARE(&tim3_handle, TIM_CHANNEL_3, TIM_3_MS_TO_TICKS(value));
       break;
 
     case SERVOOUT_CHANNEL_4:
       HAL_TIM_PWM_Start(&tim4_handle, TIM_CHANNEL_2);
-      __HAL_TIM_SET_COMPARE(&tim3_handle, TIM_CHANNEL_2, TIM_3_MS_TO_TICKS(value));
+      __HAL_TIM_SET_COMPARE(&tim3_handle, TIM_CHANNEL_4, TIM_3_MS_TO_TICKS(value));
       break;
 
     case SERVOOUT_CHANNEL_5:
@@ -186,27 +186,27 @@ void ServoOut_Stop(const enum SERVOOUT_CHANNEL channel)
   switch (channel)
   {
     case SERVOOUT_CHANNEL_1:
-      HAL_TIM_PWM_Stop(&tim3_handle, TIM_CHANNEL_1);
-      break;
-
-    case SERVOOUT_CHANNEL_2:
-      HAL_TIM_PWM_Stop(&tim3_handle, TIM_CHANNEL_2);
-      break;
-
-    case SERVOOUT_CHANNEL_3:
-      HAL_TIM_PWM_Stop(&tim4_handle, TIM_CHANNEL_1);
-      break;
-
-    case SERVOOUT_CHANNEL_4:
       HAL_TIM_PWM_Stop(&tim4_handle, TIM_CHANNEL_2);
       break;
 
+    case SERVOOUT_CHANNEL_2:
+      HAL_TIM_PWM_Stop(&tim4_handle, TIM_CHANNEL_1);
+      break;
+
+    case SERVOOUT_CHANNEL_3:
+      HAL_TIM_PWM_Stop(&tim3_handle, TIM_CHANNEL_3);
+      break;
+
+    case SERVOOUT_CHANNEL_4:
+      HAL_TIM_PWM_Stop(&tim3_handle, TIM_CHANNEL_4);
+      break;
+
     case SERVOOUT_CHANNEL_5:
-      HAL_TIM_PWM_Stop(&tim4_handle, TIM_CHANNEL_3);
+      HAL_TIM_PWM_Stop(&tim8_handle, TIM_CHANNEL_3);
       break;
 
     case SERVOOUT_CHANNEL_6:
-      HAL_TIM_PWM_Stop(&tim4_handle, TIM_CHANNEL_4);
+      HAL_TIM_PWM_Stop(&tim8_handle, TIM_CHANNEL_4);
       break;
 
     default:

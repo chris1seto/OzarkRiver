@@ -4,21 +4,21 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/ArmGccCortexM4HF.cmake")
 
 project(OzarkRiver ASM C CXX)
 
-SET(LINKER_SCRIPT "${PROJECT_SOURCE_DIR}/Platform/STM32_40K_256K_FLASH.ld")
+SET(LINKER_SCRIPT "${PROJECT_SOURCE_DIR}/Platform/STM32_192K_1M_FLASH.ld")
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--gc-sections --specs=nosys.specs -T ${LINKER_SCRIPT}")
 
 add_definitions(-DUSE_FREERTOS -DUSE_HAL_DRIVER -DUSE_FULL_LL_DRIVER)
 add_compile_options(
-    -DSTM32F405xx
-    -fno-builtin
-    -Wall
-    -ffunction-sections
-    -fdata-sections
-    -fomit-frame-pointer
-    -fno-unroll-loops
-    -ffast-math
-    -ftree-vectorize
-    -flto
+  -DSTM32F405xx
+  -fno-builtin
+  -Wall
+  -ffunction-sections
+  -fdata-sections
+  -fomit-frame-pointer
+  -fno-unroll-loops
+  -ffast-math
+  -ftree-vectorize
+  -flto
 )
 
 set(CMAKE_C_STANDARD 99)

@@ -1,6 +1,7 @@
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
-#inclue "Mpu6000.h"
+#include "Mpu6000.h"
 
 #define MPU_RA_WHO_AM_I         0x75
 #define MPU_RA_WHO_AM_I_LEGACY  0x00
@@ -203,4 +204,6 @@ bool Mpu6000_Init(const Mpu6000Instance_t* i)
   WriteS(i, MPU_RA_INT_PIN_CFG, 0 << 7 | 0 << 6 | 0 << 5 | 1 << 4 | 0 << 3 | 0 << 2 | 0 << 1 | 0 << 0);  // INT_ANYRD_2CLEAR
   
   WriteS(i, MPU_RA_INT_ENABLE, MPU_RF_DATA_RDY_EN);
+  
+  return true;
 }
