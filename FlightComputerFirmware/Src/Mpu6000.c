@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <stdbool.h>
+#inclue "Mpu6000.h"
 
 #define MPU_RA_WHO_AM_I         0x75
 #define MPU_RA_WHO_AM_I_LEGACY  0x00
@@ -128,45 +130,77 @@
 #define BIT_ACC                     0x02
 #define BIT_TEMP                    0x01
 
-void Mpu6000_Init(void)
+static bool XAction(const Mpu6000Instance_t* i, const uint8_t* write, uint8_t* const read, const uint32_t size);
+static void Delay(const uint32_t us);
+
+static bool XAction(const Mpu6000Instance_t* i, const uint8_t* write, uint8_t* const read, const uint32_t size)
+{
+  if (i->xaction == NULL)
+  {
+    return false;
+  }
+  
+  return i->xaction(write, read, size);
+}
+
+static void Delay(const uint32_t us)
+{
+  if (i->delay == NULL)
+  {
+    return;
+  }
+  
+  i->delay(us);
+}
+
+static bool Read(const Mpu6000Instance_t* i,const uint8_t reg, uint8_t* const data, const uint32_t size)
+{
+}
+
+static bool ReadS(const Mpu6000Instance_t* i, const uint8_t reg, uint8_t* const data)
+{
+  return Read(i, reg, data, 1);
+}
+
+static bool Write(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t* data)
+{
+}
+
+static bool WriteS(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t data)
+{
+  return Write(i, reg, &data, 1);
+}
+
+bool Mpu6000_Init(const Mpu6000Instance_t* i)
 {
   
-  // reset the device configuration
-  /*spiWriteReg(dev, MPU_RA_PWR_MGMT_1, BIT_H_RESET);
-  delay(100);  // datasheet specifies a 100ms delay after reset
+  // reset the iice configuration
+  WriteS(i, MPU_RA_PWR_MGMT_1, BIT_H_RESET);
+  Delay(i, 100);  // datasheet specifies a 100ms delay after reset
 
-  // reset the device signal paths
-  spiWriteReg(dev, MPU_RA_SIGNAL_PATH_RESET, BIT_GYRO | BIT_ACC | BIT_TEMP);
-  delay(100);  // datasheet specifies a 100ms delay after signal path reset
+  // reset the iice signal paths
+  WriteS(i, MPU_RA_SIGNAL_PATH_RESET, BIT_GYRO | BIT_ACC | BIT_TEMP);
+  Delay(i, 100);  // datasheet specifies a 100ms delay after signal path reset
 
   // Clock Source PPL with Z axis gyro reference
-  spiWriteReg(&gyro->dev, MPU_RA_PWR_MGMT_1, MPU_CLK_SEL_PLLGYROZ);
-  delayMicroseconds(15);
+  WriteS(i, MPU_RA_PWR_MGMT_1, MPU_CLK_SEL_PLLGYROZ);
 
   // Disable Primary I2C Interface
-  spiWriteReg(&gyro->dev, MPU_RA_USER_CTRL, BIT_I2C_IF_DIS);
-  delayMicroseconds(15);
-
-  spiWriteReg(&gyro->dev, MPU_RA_PWR_MGMT_2, 0x00);
-  delayMicroseconds(15);
-
+  WriteS(i, MPU_RA_USER_CTRL, BIT_I2C_IF_DIS);
+  
+  WriteS(i, MPU_RA_PWR_MGMT_2, 0x00);
+  
   // Accel Sample Rate 1kHz
   // Gyroscope Output Rate =  1kHz when the DLPF is enabled
-  spiWriteReg(&gyro->dev, MPU_RA_SMPLRT_DIV, gyro->mpuDividerDrops);
-  delayMicroseconds(15);
-
+  WriteS(i, MPU_RA_SMPLRT_DIV, 0);
+  
   // Gyro +/- 2000 DPS Full Scale
-  spiWriteReg(&gyro->dev, MPU_RA_GYRO_CONFIG, INV_FSR_2000DPS << 3);
-  delayMicroseconds(15);
-
+  //WriteS(i, MPU_RA_GYRO_CONFIG, INV_FSR_2000DPS << 3);
+  
   // Accel +/- 16 G Full Scale
-  spiWriteReg(&gyro->dev, MPU_RA_ACCEL_CONFIG, INV_FSR_16G << 3);
-  delayMicroseconds(15);
-
-  spiWriteReg(&gyro->dev, MPU_RA_INT_PIN_CFG, 0 << 7 | 0 << 6 | 0 << 5 | 1 << 4 | 0 << 3 | 0 << 2 | 0 << 1 | 0 << 0);  // INT_ANYRD_2CLEAR
-  delayMicroseconds(15);
-
-  spiWriteReg(&gyro->dev, MPU_RA_INT_ENABLE, MPU_RF_DATA_RDY_EN);
-  delayMicroseconds(15);*/
-
+  WriteS(i, MPU_RA_ACCEL_CONFIG, INV_FSR_16G << 3);
+  
+  WriteS(i, MPU_RA_INT_PIN_CFG, 0 << 7 | 0 << 6 | 0 << 5 | 1 << 4 | 0 << 3 | 0 << 2 | 0 << 1 | 0 << 0);  // INT_ANYRD_2CLEAR
+  
+  WriteS(i, MPU_RA_INT_ENABLE, MPU_RF_DATA_RDY_EN);
 }

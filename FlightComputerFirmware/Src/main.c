@@ -49,7 +49,7 @@ int main(void)
   //I2c1_Init();
 
   // Init Crsf
-  //Crsf_Init();
+  Crsf_Init();
 
   // Init ServoOut
   //ServoOut_Init();
