@@ -132,7 +132,7 @@
 #define BIT_TEMP                    0x01
 
 static bool XAction(const Mpu6000Instance_t* i, const uint8_t* write, uint8_t* const read, const uint32_t size);
-static void Delay(const uint32_t us);
+static void Delay(const Mpu6000Instance_t* i, const uint32_t us);
 
 static bool XAction(const Mpu6000Instance_t* i, const uint8_t* write, uint8_t* const read, const uint32_t size)
 {
@@ -144,7 +144,7 @@ static bool XAction(const Mpu6000Instance_t* i, const uint8_t* write, uint8_t* c
   return i->xaction(write, read, size);
 }
 
-static void Delay(const uint32_t us)
+static void Delay(const Mpu6000Instance_t* i, const uint32_t us)
 {
   if (i->delay == NULL)
   {
@@ -156,6 +156,7 @@ static void Delay(const uint32_t us)
 
 static bool Read(const Mpu6000Instance_t* i,const uint8_t reg, uint8_t* const data, const uint32_t size)
 {
+  return true;
 }
 
 static bool ReadS(const Mpu6000Instance_t* i, const uint8_t reg, uint8_t* const data)
@@ -163,8 +164,9 @@ static bool ReadS(const Mpu6000Instance_t* i, const uint8_t reg, uint8_t* const 
   return Read(i, reg, data, 1);
 }
 
-static bool Write(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t* data)
+static bool Write(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t* data, const uint32_t size)
 {
+  return true;
 }
 
 static bool WriteS(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t data)
@@ -174,7 +176,7 @@ static bool WriteS(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t 
 
 bool Mpu6000_Init(const Mpu6000Instance_t* i)
 {
-  
+  /*
   // reset the iice configuration
   WriteS(i, MPU_RA_PWR_MGMT_1, BIT_H_RESET);
   Delay(i, 100);  // datasheet specifies a 100ms delay after reset
@@ -204,6 +206,6 @@ bool Mpu6000_Init(const Mpu6000Instance_t* i)
   WriteS(i, MPU_RA_INT_PIN_CFG, 0 << 7 | 0 << 6 | 0 << 5 | 1 << 4 | 0 << 3 | 0 << 2 | 0 << 1 | 0 << 0);  // INT_ANYRD_2CLEAR
   
   WriteS(i, MPU_RA_INT_ENABLE, MPU_RF_DATA_RDY_EN);
-  
+  */
   return true;
 }
