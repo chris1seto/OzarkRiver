@@ -7,7 +7,7 @@
 #include "Ticks.h"
 #include "Nmea0183.h"
 #include "SerialInterface.h"
-#include "Serial1.h"
+#include "Serial3.h"
 #include "QueueBuffer.h"
 #include "Log.h"
 
@@ -26,7 +26,7 @@ void Gps1_Init(void)
 
   nmea_message_queue = xQueueCreate(10, sizeof(GenericNmeaMessage_t));
 
-  serial_interface = Serial1_GetInterface();
+  serial_interface = Serial3_GetInterface();
 
   nmea_instance.nmea_message_queue = &nmea_message_queue;
   nmea_instance.nmea_queue = serial_interface->rx_queue;

@@ -13,6 +13,7 @@
 #include "Ticks.h"
 #include "Pid.h"
 #include "ImuAhrs.h"
+#include "Log.h"
 
 #define CONTROL_MIN -1000.0f
 #define CONTROL_MAX 1000.0f
@@ -139,6 +140,9 @@ typedef struct
   float flap;
 } FlightControlOutput_t;
 
+#define CRSF_LINK_STATS_PRINT_PERIOD   (2000 / portTICK_PERIOD_MS)
+static TickType_t last_crsf_link_stats_print = 0;
+
 #define PITCH_RATE_STICK_SCALER .45f
 #define ROLL_RATE_STICK_SCALER  .5f
 
@@ -251,6 +255,16 @@ static void FlightControlTask(void* arg)
       {
         Bits_Set(&faults, FLIGHTCONTROL_FAULT_RCIN_INVALID);
       }
+    }
+    
+    if (Ticks_IsExpired(last_crsf_link_stats_print, CRSF_LINK_STATS_PRINT_PERIOD))
+    {
+      Ticks_Reset(&last_crsf_link_stats_print);
+      LOG_W(TAG, "Link: U (%i, %i), D (%i %i)", 
+        crsf_status.link_statistics.uplink_rssi_1,
+        crsf_status.link_statistics.uplink_link_quality,
+        crsf_status.link_statistics.downlink_rssi,
+        crsf_status.link_statistics.downlink_link_quality);
     }
 
     // Select flight mode

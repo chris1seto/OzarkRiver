@@ -12,6 +12,7 @@
 #include "I2c1.h"
 #include "ImuAhrs.h"
 #include "Ticks.h"
+#include "Gps1.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -47,6 +48,8 @@ int main(void)
 
   // Init I2c1
   //I2c1_Init();
+  
+  Gps1_Init();
 
   // Init Crsf
   //Crsf_Init();

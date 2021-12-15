@@ -75,7 +75,7 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
   data_rx_event_count = new_data_rx_event_count;
 
   // Enable clocks
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_USART3_CLK_ENABLE();
   __HAL_RCC_DMA1_CLK_ENABLE();
 
@@ -87,17 +87,16 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
   // RX
   GPIO_InitStruct.Pin       = GPIO_PIN_11;
   GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*
     USART3 DMA1
-      RX: Channel 3
-
-      TX: Channel 2
+      RX: (Stream 1, Channel 4), 
+      TX: (Stream 3, Channel 4), 
   */
 
   // DMA RX
-  //dma_rx_handle.PeriphOrM2MSrcAddress = LL_USART_DMA_GetRegAddr(USART3, LL_USART_DMA_REG_DATA_RECEIVE);
+  dma_rx_handle.PeriphOrM2MSrcAddress = LL_USART_DMA_GetRegAddr(USART3);
   dma_rx_handle.MemoryOrM2MDstAddress = (uint32_t)dma_rx_buffer;
   dma_rx_handle.Direction = LL_DMA_DIRECTION_PERIPH_TO_MEMORY;
   dma_rx_handle.Mode = LL_DMA_MODE_CIRCULAR;
@@ -106,20 +105,19 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
   dma_rx_handle.PeriphOrM2MSrcDataSize = LL_DMA_PDATAALIGN_BYTE;
   dma_rx_handle.MemoryOrM2MDstDataSize = LL_DMA_MDATAALIGN_BYTE;
   dma_rx_handle.NbData = DMA_BUFFER_SIZE;
+  dma_rx_handle.Channel = LL_DMA_CHANNEL_4;
   dma_rx_handle.Priority = LL_DMA_PRIORITY_VERYHIGH;
-  LL_DMA_Init(DMA1, LL_DMA_CHANNEL_3, &dma_rx_handle);
+  LL_DMA_Init(DMA1, LL_DMA_STREAM_1, &dma_rx_handle);
 
   // Configure the USART peripheral
   uart_handle.Instance          = USART3;
-  uart_handle.Init.BaudRate     = 420000;
+  uart_handle.Init.BaudRate     = baud;
   uart_handle.Init.WordLength   = UART_WORDLENGTH_8B;
   uart_handle.Init.StopBits     = UART_STOPBITS_1;
   uart_handle.Init.Parity       = UART_PARITY_NONE;
   uart_handle.Init.HwFlowCtl    = UART_HWCONTROL_NONE;
   uart_handle.Init.OverSampling = UART_OVERSAMPLING_16;
-  //uart_handle.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   uart_handle.Init.Mode         = UART_MODE_RX;
-  //uart_handle.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
   HAL_UART_Init(&uart_handle);
 
@@ -134,11 +132,10 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
   __HAL_UART_CLEAR_PEFLAG(&uart_handle);
   __HAL_UART_CLEAR_NEFLAG(&uart_handle);
   __HAL_UART_CLEAR_OREFLAG(&uart_handle);
-  //uart_handle.Instance->RQR |= USART_RQR_RXFRQ;
 
   // Start RX
   LL_USART_EnableDMAReq_RX(USART3);
-  //LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_3);
+  LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_1);
 
   xTaskCreate(Serial3Task, TAG, 500, NULL, 0, NULL);
 
@@ -162,7 +159,7 @@ static void CopyFromDma(void)
   uint32_t end_index;
 
   // Get the index of the end of the buffer
-  end_index = DMA_BUFFER_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_3);
+  end_index = DMA_BUFFER_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_STREAM_1);
 
   // If there is nothing to copy
   // If you let the buffer loop back, you will lose the entire buffer
