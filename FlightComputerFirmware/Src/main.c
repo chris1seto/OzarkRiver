@@ -14,6 +14,7 @@
 #include "Ticks.h"
 #include "Gps1.h"
 #include "Spi1.h"
+#include "Fs.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -49,6 +50,9 @@ int main(void)
   // Init LEDs
   //Leds_Init();
   //Leds_Off(LED_RED);
+  
+  // Init FS
+  Fs_Init();
 
   // Init I2c1
   //I2c1_Init();

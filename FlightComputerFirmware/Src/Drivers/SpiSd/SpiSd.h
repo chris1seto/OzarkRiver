@@ -1,6 +1,9 @@
 #ifndef SPISD_H
 #define SPISD_H
 
+#include "integer.h"
+#include "diskio.h"
+
 // Definitions for MMC/SDC command
 #define CMD0     (0x40+0)     	/* GO_IDLE_STATE */
 #define CMD1     (0x40+1)     	/* SEND_OP_COND */

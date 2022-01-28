@@ -129,7 +129,7 @@ void ImuAhrs_Init(void)
 
   // Set optional magnetic field limits
   FusionAhrsSetMagneticField(&fusion_ahrs, 20.0f, 70.0f);
-  
+
   mpu6000_i.delay = Mpu6000_Delay_Shim;
   mpu6000_i.xaction = Mpu6000_XAction_Shim;
   Mpu6000_Init(&mpu6000_i);
@@ -213,7 +213,7 @@ static void ImuAhrsTask(void* arg)
   FusionVector3 calibrated_gyro;
   FusionVector3 calibrated_accel;
   FusionVector3 calibrated_mag;
-  
+
   Mpu6000AccelXyz_t accel;
   Mpu6000GyroXyz_t gyro;
   int16_t accel_gyro_temp;
@@ -224,19 +224,19 @@ static void ImuAhrsTask(void* arg)
     {
       Bits_Set(&flags, IMUAHRS_FLAGS_ACCEL_FAIL | IMUAHRS_FLAGS_GYRO_FAIL);
     }
-    
+    else
+    {
+      Bits_Clear(&flags, IMUAHRS_FLAGS_ACCEL_FAIL | IMUAHRS_FLAGS_GYRO_FAIL);
+    }
+
     raw_imu_data.accel.s.x = accel.x;
     raw_imu_data.accel.s.y = accel.y;
     raw_imu_data.accel.s.z = accel.z;
-    
+
     raw_imu_data.gyro.s.x = gyro.x;
     raw_imu_data.gyro.s.y = gyro.y;
     raw_imu_data.gyro.s.z = gyro.z;
-    
-    
-    printf("%i %i %i     %i %i %i\r\n", accel.x, accel.y, accel.z, gyro.x, gyro.y, gyro.z);
-    vTaskDelay(IMUAHRS_PERIOD);
-    continue;
+
     // Shim measurements
     for (i = 0; i < 3; i++)
     {
