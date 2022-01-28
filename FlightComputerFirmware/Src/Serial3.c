@@ -91,8 +91,8 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
 
   /*
     USART3 DMA1
-      RX: (Stream 1, Channel 4), 
-      TX: (Stream 3, Channel 4), 
+      RX: (Stream 1, Channel 4),
+      TX: (Stream 3, Channel 4),
   */
 
   // DMA RX
@@ -135,7 +135,7 @@ static bool Serial3Init(const uint32_t baud, const uint32_t new_data_rx_event_co
 
   // Start RX
   LL_USART_EnableDMAReq_RX(USART3);
-  LL_DMA_EnableStream(DMA2, LL_DMA_STREAM_1);
+  LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1);
 
   xTaskCreate(Serial3Task, TAG, 500, NULL, 0, NULL);
 

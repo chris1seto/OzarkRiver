@@ -130,7 +130,7 @@ void Crsf_Init(void)
   crsf_status_queue = xQueueCreate(1, sizeof(CrsfStatus_t));
 
   serial_interface = Serial3_GetInterface();
-  serial_interface->init(0, 0);
+  serial_interface->init(420000, 0);
 
   xTaskCreate(CrsfTask, TAG, 800, NULL, 0, NULL);
 }

@@ -13,6 +13,7 @@
 #include "ImuAhrs.h"
 #include "Ticks.h"
 #include "Gps1.h"
+#include "Spi1.h"
 
 void xPortSysTickHandler(void);
 void vApplicationTickHook( void );
@@ -41,6 +42,9 @@ int main(void)
 
   // Short delay to let the board settle
   HAL_Delay(100);
+  
+  // Init communication
+  Spi1_Init();
 
   // Init LEDs
   //Leds_Init();
@@ -49,16 +53,16 @@ int main(void)
   // Init I2c1
   //I2c1_Init();
   
-  Gps1_Init();
+  //Gps1_Init();
 
   // Init Crsf
-  //Crsf_Init();
+  Crsf_Init();
 
   // Init ServoOut
   ServoOut_Init();
 
   // Init ImuAhrs
-  //ImuAhrs_Init();
+  ImuAhrs_Init();
 
   // Init FlightControl
   //FlightControl_Init();

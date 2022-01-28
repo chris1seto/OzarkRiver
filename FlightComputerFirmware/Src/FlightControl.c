@@ -98,17 +98,19 @@ enum RC_INPUT_CHANNEL
   RC_INPUT_CHANNEL_ARM = 4,
   RC_INPUT_CHANNEL_MODE = 5,
   RC_INPUT_CHANNEL_FLAPS = 6,
+  RC_INPUT_CHANNEL_PAN = 7,
 };
 
 #define RC_INPUT_CHANNEL_COUNT 6
 
 enum SERVO_ACTUATOR_OUTPUT
 {
-  SERVO_ACTUATOR_OUTPUT_THROTTLE = 0,
-  SERVO_ACTUATOR_OUTPUT_ELEVATOR = 1,
-  SERVO_ACTUATOR_OUTPUT_RUDDER = 2,
-  SERVO_ACTUATOR_OUTPUT_AILERON_LEFT = 3,
-  SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT = 4,
+  SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT = 0,
+  SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT = 1,
+  SERVO_ACTUATOR_OUTPUT_AILERON_LEFT = 2,
+  SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT = 3,
+  SERVO_ACTUATOR_OUTPUT_ELEVATOR = 4,
+  SERVO_ACTUATOR_OUTPUT_PAN = 5,
 };
 
 typedef struct
@@ -119,16 +121,19 @@ typedef struct
   enum SERVOOUT_CHANNEL target;
 } ServoActuatorTranslation_t;
 
-#define SERVO_ACTUATOR_COUNT 5
+#define SERVO_ACTUATOR_COUNT 6
 static const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
 {
-  [SERVO_ACTUATOR_OUTPUT_THROTTLE]        = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_1},
-  [SERVO_ACTUATOR_OUTPUT_ELEVATOR]        = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_2},
-  [SERVO_ACTUATOR_OUTPUT_RUDDER]          = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_3},
+  [SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT]        = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_1},
+  [SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT]        = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_2},
+  
   //                                          D       C      U
-  [SERVO_ACTUATOR_OUTPUT_AILERON_LEFT]    = {0.85f, 1.65f, 2.40f, SERVOOUT_CHANNEL_4},
+  [SERVO_ACTUATOR_OUTPUT_AILERON_LEFT]    = {0.85f, 1.65f, 2.40f, SERVOOUT_CHANNEL_3},
   //                                          U       C      D
-  [SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT]   = {2.60f, 1.65f, 1.00f, SERVOOUT_CHANNEL_5},
+  [SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT]   = {2.60f, 1.65f, 1.00f, SERVOOUT_CHANNEL_4},
+  
+  [SERVO_ACTUATOR_OUTPUT_ELEVATOR]        = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_5},
+  [SERVO_ACTUATOR_OUTPUT_PAN]            = {1.2f, 1.5f, 1.8f, SERVOOUT_CHANNEL_5},
 };
 
 typedef struct
@@ -140,9 +145,6 @@ typedef struct
   float flap;
 } FlightControlOutput_t;
 
-#define CRSF_LINK_STATS_PRINT_PERIOD   (2000 / portTICK_PERIOD_MS)
-static TickType_t last_crsf_link_stats_print = 0;
-
 #define PITCH_RATE_STICK_SCALER .45f
 #define ROLL_RATE_STICK_SCALER  .5f
 
@@ -152,6 +154,9 @@ static TickType_t last_crsf_link_stats_print = 0;
 #define RATE_INTEGRATOR_MAX 250
 
 #define FLAP_SCALER .5f
+
+#define CRSF_LINK_STATS_PRINT_PERIOD   (2000 / portTICK_PERIOD_MS)
+static TickType_t last_crsf_link_stats_print = 0;
 
 static enum FLIGHTCONTROL_COMMAND last_flight_control_command = FLIGHTCONTROL_COMMAND_NONE;
 
@@ -255,16 +260,14 @@ static void FlightControlTask(void* arg)
       {
         Bits_Set(&faults, FLIGHTCONTROL_FAULT_RCIN_INVALID);
       }
-    }
-    
-    if (Ticks_IsExpired(last_crsf_link_stats_print, CRSF_LINK_STATS_PRINT_PERIOD))
-    {
-      Ticks_Reset(&last_crsf_link_stats_print);
-      LOG_W(TAG, "Link: U (%i, %i), D (%i %i)", 
-        crsf_status.link_statistics.uplink_rssi_1,
-        crsf_status.link_statistics.uplink_link_quality,
-        crsf_status.link_statistics.downlink_rssi,
-        crsf_status.link_statistics.downlink_link_quality);
+      
+      if (Ticks_IsExpired(last_crsf_link_stats_print, CRSF_LINK_STATS_PRINT_PERIOD))
+      {
+        Ticks_Reset(&last_crsf_link_stats_print);
+        LOG_W(TAG, "Link: %i, %i", 
+          crsf_status.link_statistics.uplink_rssi_1,
+          crsf_status.link_statistics.uplink_link_quality);
+      }
     }
 
     // Select flight mode
@@ -400,11 +403,13 @@ static void CommitActuators(const FlightControlOutput_t* controls)
 {
   float actuators[SERVO_ACTUATOR_COUNT];
 
-  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE] = controls->throttle;
-  actuators[SERVO_ACTUATOR_OUTPUT_ELEVATOR] = controls->pitch;
-  actuators[SERVO_ACTUATOR_OUTPUT_RUDDER] = controls->yaw;
+  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT] = controls->throttle;
+  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT] = controls->throttle;
+  
   actuators[SERVO_ACTUATOR_OUTPUT_AILERON_LEFT] = controls->roll + controls->flap;
   actuators[SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT] = -controls->roll + controls->flap;
+  
+  actuators[SERVO_ACTUATOR_OUTPUT_ELEVATOR] = controls->pitch;
 
   ServoActuatorTranslate((float*)&actuators, (ServoActuatorTranslation_t*)&servo_accuator_translations, SERVO_ACTUATOR_COUNT);
 }

@@ -11,6 +11,10 @@
 #include "I2c1.h"
 #include "ImuAhrs.h"
 #include "Bits.h"
+#include "Mpu6000.h"
+#include "Spi1.h"
+
+static Mpu6000Instance_t mpu6000_i = {0};
 
 static QueueHandle_t imu_ahrs_status_queue;
 static ImuAhrsStatus_t imu_ahrs_status = {0};
@@ -108,6 +112,9 @@ static void ImuAhrsTask(void* arg);
 
 #define INIT_COUNT_LIMIT 5
 
+static bool Mpu6000_XAction_Shim(const uint8_t* write, uint8_t* const read, const uint32_t size);
+static void Mpu6000_Delay_Shim(const uint32_t us);
+
 void ImuAhrs_Init(void)
 {
   imu_ahrs_status_queue = xQueueCreate(1, sizeof(ImuAhrsStatus_t));
@@ -122,8 +129,22 @@ void ImuAhrs_Init(void)
 
   // Set optional magnetic field limits
   FusionAhrsSetMagneticField(&fusion_ahrs, 20.0f, 70.0f);
+  
+  mpu6000_i.delay = Mpu6000_Delay_Shim;
+  mpu6000_i.xaction = Mpu6000_XAction_Shim;
+  Mpu6000_Init(&mpu6000_i);
 
   xTaskCreate(ImuAhrsTask, TAG, 700, NULL, 0, NULL);
+}
+
+static bool Mpu6000_XAction_Shim(const uint8_t* write, uint8_t* const read, const uint32_t size)
+{
+  return Spi1_Transaction(SPI1_TARGET_MPU6000, write, read, size);
+}
+
+static void Mpu6000_Delay_Shim(const uint32_t us)
+{
+  HAL_Delay(us);
 }
 
 static bool is_converged = false;
@@ -192,9 +213,18 @@ static void ImuAhrsTask(void* arg)
   FusionVector3 calibrated_gyro;
   FusionVector3 calibrated_accel;
   FusionVector3 calibrated_mag;
+  
+  Mpu6000AccelXyz_t accel;
+  Mpu6000GyroXyz_t gyro;
 
   while (true)
   {
+    Mpu6000_ReadAccelGyro(&mpu6000_i, &accel, &gyro);
+    
+    
+    printf("%i %i %i     %i %i %i\r\n", accel.x, accel.y, accel.z, gyro.x, gyro.y, gyro.z);
+    vTaskDelay(IMUAHRS_PERIOD);
+    continue;
     // Shim measurements
     for (i = 0; i < 3; i++)
     {

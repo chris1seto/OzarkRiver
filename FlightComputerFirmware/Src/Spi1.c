@@ -46,17 +46,17 @@ void Spi1_Init(void)
 
   // Init SPI
   spi_handle.Instance               = SPI1;
-  spi_handle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  spi_handle.Init.Mode              = SPI_MODE_MASTER;
   spi_handle.Init.Direction         = SPI_DIRECTION_2LINES;
-  spi_handle.Init.CLKPhase          = SPI_PHASE_2EDGE;
-  spi_handle.Init.CLKPolarity       = SPI_POLARITY_HIGH;
   spi_handle.Init.DataSize          = SPI_DATASIZE_8BIT;
+  spi_handle.Init.CLKPolarity       = SPI_POLARITY_HIGH;
+  spi_handle.Init.CLKPhase          = SPI_PHASE_2EDGE;
+  spi_handle.Init.NSS               = SPI_NSS_SOFT;
+  spi_handle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   spi_handle.Init.FirstBit          = SPI_FIRSTBIT_MSB;
   spi_handle.Init.TIMode            = SPI_TIMODE_DISABLE;
   spi_handle.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
   spi_handle.Init.CRCPolynomial     = 7;
-  spi_handle.Init.NSS               = SPI_NSS_SOFT;
-  spi_handle.Init.Mode              = SPI_MODE_MASTER;
   HAL_SPI_Init(&spi_handle);
 }
 

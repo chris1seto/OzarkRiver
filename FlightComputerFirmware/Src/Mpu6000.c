@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <string.h>
+#include <stdio.h>
 #include "Mpu6000.h"
 
 #define MPU_RA_WHO_AM_I         0x75
@@ -131,6 +133,44 @@
 #define BIT_ACC                     0x02
 #define BIT_TEMP                    0x01
 
+enum gyro_fsr_e
+{
+  INV_FSR_250DPS = 0,
+  INV_FSR_500DPS,
+  INV_FSR_1000DPS,
+  INV_FSR_2000DPS,
+  NUM_GYRO_FSR
+};
+
+enum fchoice_b
+{
+  FCB_DISABLED = 0,
+  FCB_8800_32,
+  FCB_3600_32
+};
+
+enum clock_sel_e
+{
+  INV_CLK_INTERNAL = 0,
+  INV_CLK_PLL,
+  NUM_CLK
+};
+
+enum accel_fsr_e
+{
+  INV_FSR_2G = 0,
+  INV_FSR_4G,
+  INV_FSR_8G,
+  INV_FSR_16G,
+  NUM_ACCEL_FSR
+};
+
+#define X_BUFFER_SIZE 128
+static uint8_t x_buffer_rx[X_BUFFER_SIZE];
+static uint8_t x_buffer_tx[X_BUFFER_SIZE];
+
+#define ADDRESS_WORD_SIZE 1
+
 static bool XAction(const Mpu6000Instance_t* i, const uint8_t* write, uint8_t* const read, const uint32_t size);
 static void Delay(const Mpu6000Instance_t* i, const uint32_t us);
 
@@ -140,7 +180,7 @@ static bool XAction(const Mpu6000Instance_t* i, const uint8_t* write, uint8_t* c
   {
     return false;
   }
-  
+
   return i->xaction(write, read, size);
 }
 
@@ -150,23 +190,33 @@ static void Delay(const Mpu6000Instance_t* i, const uint32_t us)
   {
     return;
   }
-  
+
   i->delay(us);
 }
 
 static bool Read(const Mpu6000Instance_t* i,const uint8_t reg, uint8_t* const data, const uint32_t size)
 {
+  x_buffer_tx[0] = (1 << 7) | (reg & 0x7f);
+  if (!XAction(i, x_buffer_tx, x_buffer_rx, size + ADDRESS_WORD_SIZE))
+  {
+    return false;
+  }
+
+  memcpy(data, x_buffer_rx + ADDRESS_WORD_SIZE, size);
   return true;
+}
+
+static bool Write(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t* data, const uint32_t size)
+{
+  x_buffer_tx[0] = (0 << 7) | (reg & 0x7f);
+  memcpy(x_buffer_tx + ADDRESS_WORD_SIZE, data, size);
+
+  return XAction(i, x_buffer_tx, x_buffer_rx, size + ADDRESS_WORD_SIZE);
 }
 
 static bool ReadS(const Mpu6000Instance_t* i, const uint8_t reg, uint8_t* const data)
 {
   return Read(i, reg, data, 1);
-}
-
-static bool Write(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t* data, const uint32_t size)
-{
-  return true;
 }
 
 static bool WriteS(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t data)
@@ -176,36 +226,52 @@ static bool WriteS(const Mpu6000Instance_t* i, const uint8_t reg, const uint8_t 
 
 bool Mpu6000_Init(const Mpu6000Instance_t* i)
 {
-  /*
-  // reset the iice configuration
+  // Reset configuration
   WriteS(i, MPU_RA_PWR_MGMT_1, BIT_H_RESET);
-  Delay(i, 100);  // datasheet specifies a 100ms delay after reset
+  Delay(i, 100);
 
-  // reset the iice signal paths
+  // Reset signal paths
   WriteS(i, MPU_RA_SIGNAL_PATH_RESET, BIT_GYRO | BIT_ACC | BIT_TEMP);
-  Delay(i, 100);  // datasheet specifies a 100ms delay after signal path reset
+  Delay(i, 100);
 
   // Clock Source PPL with Z axis gyro reference
   WriteS(i, MPU_RA_PWR_MGMT_1, MPU_CLK_SEL_PLLGYROZ);
 
   // Disable Primary I2C Interface
   WriteS(i, MPU_RA_USER_CTRL, BIT_I2C_IF_DIS);
-  
+
   WriteS(i, MPU_RA_PWR_MGMT_2, 0x00);
-  
+
   // Accel Sample Rate 1kHz
   // Gyroscope Output Rate =  1kHz when the DLPF is enabled
   WriteS(i, MPU_RA_SMPLRT_DIV, 0);
-  
+
   // Gyro +/- 2000 DPS Full Scale
-  //WriteS(i, MPU_RA_GYRO_CONFIG, INV_FSR_2000DPS << 3);
-  
+  WriteS(i, MPU_RA_GYRO_CONFIG, INV_FSR_2000DPS << 3);
+
   // Accel +/- 16 G Full Scale
   WriteS(i, MPU_RA_ACCEL_CONFIG, INV_FSR_16G << 3);
+
+  return true;
+}
+
+#define ACCEL_GYRO_WORD_SIZE 2
+bool Mpu6000_ReadAccelGyro(const Mpu6000Instance_t* i, Mpu6000AccelXyz_t* const accel, Mpu6000GyroXyz_t* const gyro)
+{
+  uint8_t accel_gyro_raw[6 * ACCEL_GYRO_WORD_SIZE];
   
-  WriteS(i, MPU_RA_INT_PIN_CFG, 0 << 7 | 0 << 6 | 0 << 5 | 1 << 4 | 0 << 3 | 0 << 2 | 0 << 1 | 0 << 0);  // INT_ANYRD_2CLEAR
+  if (!Read(i, MPU_RA_ACCEL_XOUT_H, (uint8_t*)&accel_gyro_raw, 6 * ACCEL_GYRO_WORD_SIZE))
+  {
+    return false;
+  }
   
-  WriteS(i, MPU_RA_INT_ENABLE, MPU_RF_DATA_RDY_EN);
-  */
+  accel->x = (accel_gyro_raw[0] << 8) | accel_gyro_raw[1];
+  accel->y = (accel_gyro_raw[2] << 8) | accel_gyro_raw[3];
+  accel->z = (accel_gyro_raw[4] << 8) | accel_gyro_raw[5];
+  
+  gyro->x = (accel_gyro_raw[6] << 8) | accel_gyro_raw[7];
+  gyro->y = (accel_gyro_raw[8] << 8) | accel_gyro_raw[9];
+  gyro->z = (accel_gyro_raw[10] << 8) | accel_gyro_raw[11];
+  
   return true;
 }
