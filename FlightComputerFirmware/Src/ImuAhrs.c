@@ -216,10 +216,22 @@ static void ImuAhrsTask(void* arg)
   
   Mpu6000AccelXyz_t accel;
   Mpu6000GyroXyz_t gyro;
+  int16_t accel_gyro_temp;
 
   while (true)
   {
-    Mpu6000_ReadAccelGyro(&mpu6000_i, &accel, &gyro);
+    if (!Mpu6000_ReadAccelTempGyro(&mpu6000_i, &accel, &accel_gyro_temp, &gyro))
+    {
+      Bits_Set(&flags, IMUAHRS_FLAGS_ACCEL_FAIL | IMUAHRS_FLAGS_GYRO_FAIL);
+    }
+    
+    raw_imu_data.accel.s.x = accel.x;
+    raw_imu_data.accel.s.y = accel.y;
+    raw_imu_data.accel.s.z = accel.z;
+    
+    raw_imu_data.gyro.s.x = gyro.x;
+    raw_imu_data.gyro.s.y = gyro.y;
+    raw_imu_data.gyro.s.z = gyro.z;
     
     
     printf("%i %i %i     %i %i %i\r\n", accel.x, accel.y, accel.z, gyro.x, gyro.y, gyro.z);

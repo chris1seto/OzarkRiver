@@ -256,9 +256,9 @@ bool Mpu6000_Init(const Mpu6000Instance_t* i)
 }
 
 #define ACCEL_GYRO_WORD_SIZE 2
-bool Mpu6000_ReadAccelGyro(const Mpu6000Instance_t* i, Mpu6000AccelXyz_t* const accel, Mpu6000GyroXyz_t* const gyro)
+bool Mpu6000_ReadAccelTempGyro(const Mpu6000Instance_t* i, Mpu6000AccelXyz_t* const accel, int16_t* const temp, Mpu6000GyroXyz_t* const gyro)
 {
-  uint8_t accel_gyro_raw[6 * ACCEL_GYRO_WORD_SIZE];
+  uint8_t accel_gyro_raw[7 * ACCEL_GYRO_WORD_SIZE];
   
   if (!Read(i, MPU_RA_ACCEL_XOUT_H, (uint8_t*)&accel_gyro_raw, 6 * ACCEL_GYRO_WORD_SIZE))
   {
@@ -269,9 +269,11 @@ bool Mpu6000_ReadAccelGyro(const Mpu6000Instance_t* i, Mpu6000AccelXyz_t* const 
   accel->y = (accel_gyro_raw[2] << 8) | accel_gyro_raw[3];
   accel->z = (accel_gyro_raw[4] << 8) | accel_gyro_raw[5];
   
-  gyro->x = (accel_gyro_raw[6] << 8) | accel_gyro_raw[7];
-  gyro->y = (accel_gyro_raw[8] << 8) | accel_gyro_raw[9];
-  gyro->z = (accel_gyro_raw[10] << 8) | accel_gyro_raw[11];
+  *temp = (accel_gyro_raw[6] << 8) | accel_gyro_raw[7];
+  
+  gyro->x = (accel_gyro_raw[8] << 8) | accel_gyro_raw[9];
+  gyro->y = (accel_gyro_raw[10] << 8) | accel_gyro_raw[11];
+  gyro->z = (accel_gyro_raw[12] << 8) | accel_gyro_raw[13];
   
   return true;
 }

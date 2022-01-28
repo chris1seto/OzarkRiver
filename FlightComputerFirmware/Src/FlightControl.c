@@ -124,16 +124,19 @@ typedef struct
 #define SERVO_ACTUATOR_COUNT 6
 static const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUATOR_COUNT] =
 {
-  [SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT]        = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_1},
-  [SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT]        = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_2},
+  [SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT]   = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_1},
+  [SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT]  = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_2},
   
   //                                          D       C      U
   [SERVO_ACTUATOR_OUTPUT_AILERON_LEFT]    = {0.85f, 1.65f, 2.40f, SERVOOUT_CHANNEL_3},
   //                                          U       C      D
   [SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT]   = {2.60f, 1.65f, 1.00f, SERVOOUT_CHANNEL_4},
   
+  //                                          D      C    U
   [SERVO_ACTUATOR_OUTPUT_ELEVATOR]        = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_5},
-  [SERVO_ACTUATOR_OUTPUT_PAN]            = {1.2f, 1.5f, 1.8f, SERVOOUT_CHANNEL_5},
+  
+  //                                          L      C     R
+  [SERVO_ACTUATOR_OUTPUT_PAN]             = {1.2f, 1.5f, 1.8f, SERVOOUT_CHANNEL_6},
 };
 
 typedef struct
@@ -241,8 +244,8 @@ static void FlightControlTask(void* arg)
     else
     {
       // Check if there is any condition that would make the imuahrs unusable
-      if (Bits_IsSet(imu_ahrs_status.flags, IMUAHRS_FLAGS_MPU6050_FAIL)
-        || Bits_IsSet(imu_ahrs_status.flags, IMUAHRS_FLAGS_HMC5983_FAIL)
+      if (Bits_IsSet(imu_ahrs_status.flags, IMUAHRS_FLAGS_ACCEL_FAIL)
+        || Bits_IsSet(imu_ahrs_status.flags, IMUAHRS_FLAGS_GYRO_FAIL)
         || Bits_IsSet(imu_ahrs_status.flags, IMUAHRS_FLAGS_CALIBRATING))
       {
         Bits_Set(&faults, FLIGHTCONTROL_FAULT_IMUAHRS_INVALID);
@@ -403,13 +406,15 @@ static void CommitActuators(const FlightControlOutput_t* controls)
 {
   float actuators[SERVO_ACTUATOR_COUNT];
 
-  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT] = controls->throttle;
-  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT] = controls->throttle;
+  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT] = controls->throttle + controls->yaw;
+  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT] = controls->throttle - controls->yaw;
   
   actuators[SERVO_ACTUATOR_OUTPUT_AILERON_LEFT] = controls->roll + controls->flap;
   actuators[SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT] = -controls->roll + controls->flap;
   
   actuators[SERVO_ACTUATOR_OUTPUT_ELEVATOR] = controls->pitch;
+  
+  actuators[SERVO_ACTUATOR_OUTPUT_PAN] = controls->yaw;
 
   ServoActuatorTranslate((float*)&actuators, (ServoActuatorTranslation_t*)&servo_accuator_translations, SERVO_ACTUATOR_COUNT);
 }
