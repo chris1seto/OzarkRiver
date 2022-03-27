@@ -29,7 +29,7 @@ static SPI_HandleTypeDef spi_handle;
   // Init SPI3 GPIO
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
 
   // SPI3_MISO
   GPIO_InitStruct.Pin = GPIO_PIN_4;

@@ -31,9 +31,9 @@ int main(void)
   SystemClock_Config();
 
   // Init Watchdog
-  Watchdog_Refresh();
-  Watchdog_Init();
-  Watchdog_Refresh();
+  //Watchdog_Refresh();
+  //Watchdog_Init();
+  //Watchdog_Refresh();
 
   HAL_InitTick(0);
   __HAL_RCC_SYSCFG_CLK_ENABLE();
@@ -52,7 +52,7 @@ int main(void)
   //Leds_Off(LED_RED);
   
   // Init FS
-  Fs_Init();
+  //Fs_Init();
 
   // Init I2c1
   //I2c1_Init();
@@ -69,7 +69,7 @@ int main(void)
   ImuAhrs_Init();
 
   // Init FlightControl
-  //FlightControl_Init();
+  FlightControl_Init();
 
   // Start main task
   xTaskCreate(MainTask, "MAIN", 256, NULL, 0, NULL);

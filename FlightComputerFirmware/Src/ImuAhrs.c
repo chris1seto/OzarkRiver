@@ -19,6 +19,9 @@ static Mpu6000Instance_t mpu6000_i = {0};
 static QueueHandle_t imu_ahrs_status_queue;
 static ImuAhrsStatus_t imu_ahrs_status = {0};
 
+#define MPU6050_DPS_PER_LSB 0.06103515625f
+#define MPU6050_GS_PER_LSB  0.00048828125
+
 typedef struct
 {
   int16_t x;
@@ -57,17 +60,17 @@ static bool is_calibrated = false;
 // Degrees per second per LSB
 static const FusionVector3 gyroscope_sensitivity =
 {
-  .axis.x = 0,
-  .axis.y = 0,
-  .axis.z = 0,
+  .axis.x = MPU6050_DPS_PER_LSB,
+  .axis.y = MPU6050_DPS_PER_LSB,
+  .axis.z = MPU6050_DPS_PER_LSB,
 };
 
 // G's per LSB
 static const FusionVector3 accelerometer_sensitivity =
 {
-  .axis.x = 0,
-  .axis.y = 0,
-  .axis.z = 0,
+  .axis.x = MPU6050_GS_PER_LSB,
+  .axis.y = MPU6050_GS_PER_LSB,
+  .axis.z = MPU6050_GS_PER_LSB,
 };
 
 // Align mpu6050, 90
@@ -128,7 +131,7 @@ void ImuAhrs_Init(void)
   FusionAhrsInitialise(&fusion_ahrs, 0.5f);
 
   // Set optional magnetic field limits
-  FusionAhrsSetMagneticField(&fusion_ahrs, 20.0f, 70.0f);
+  //FusionAhrsSetMagneticField(&fusion_ahrs, 20.0f, 70.0f);
 
   mpu6000_i.delay = Mpu6000_Delay_Shim;
   mpu6000_i.xaction = Mpu6000_XAction_Shim;
@@ -282,13 +285,13 @@ static void ImuAhrsTask(void* arg)
 
     calibrated_gyro = FusionCalibrationInertial(uncalibrated_gyro, accel_gyro_alignment, gyroscope_sensitivity, FUSION_VECTOR3_ZERO);
     calibrated_accel = FusionCalibrationInertial(uncalibrated_accel, accel_gyro_alignment, accelerometer_sensitivity, FUSION_VECTOR3_ZERO);
-    calibrated_mag = FusionCalibrationMagnetic(uncalibrated_mag, mag_alignment, hard_iron_bias);
+    //calibrated_mag = FusionCalibrationMagnetic(uncalibrated_mag, mag_alignment, hard_iron_bias);
 
     // Update gyroscope bias correction
     calibrated_gyro = FusionBiasUpdate(&fusion_bias, calibrated_gyro);
 
     // Update AHRS
-    FusionAhrsUpdate(&fusion_ahrs, calibrated_gyro, calibrated_accel, calibrated_mag, madgwick_sample_period_s);
+    FusionAhrsUpdateWithoutMagnetometer(&fusion_ahrs, calibrated_gyro, calibrated_accel, madgwick_sample_period_s);
 
     // Generate euler angles
     euler_angles = FusionQuaternionToEulerAngles(FusionAhrsGetQuaternion(&fusion_ahrs));

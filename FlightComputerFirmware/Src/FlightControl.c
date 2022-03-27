@@ -128,15 +128,15 @@ static const ServoActuatorTranslation_t servo_accuator_translations[SERVO_ACTUAT
   [SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT]  = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_2},
   
   //                                          D       C      U
-  [SERVO_ACTUATOR_OUTPUT_AILERON_LEFT]    = {0.85f, 1.65f, 2.40f, SERVOOUT_CHANNEL_3},
+  [SERVO_ACTUATOR_OUTPUT_AILERON_LEFT]    = {2.0f, 1.5f, 1.00f, SERVOOUT_CHANNEL_3},
   //                                          U       C      D
-  [SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT]   = {2.60f, 1.65f, 1.00f, SERVOOUT_CHANNEL_4},
+  [SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT]   = {1.0f, 1.5f, 2.0f, SERVOOUT_CHANNEL_4},
   
   //                                          D      C    U
   [SERVO_ACTUATOR_OUTPUT_ELEVATOR]        = {2.0f, 1.5f, 1.0f, SERVOOUT_CHANNEL_5},
   
   //                                          L      C     R
-  [SERVO_ACTUATOR_OUTPUT_PAN]             = {1.2f, 1.5f, 1.8f, SERVOOUT_CHANNEL_6},
+  [SERVO_ACTUATOR_OUTPUT_PAN]             = {1.35f, 1.55f, 1.75f, SERVOOUT_CHANNEL_6},
 };
 
 typedef struct
@@ -178,8 +178,8 @@ void FlightControl_Init(void)
   Pid_SetOutputLimit(&pitch_rate_pid, CONTROL_MIN, CONTROL_MAX);
   Pid_SetOutputLimit(&roll_rate_pid, CONTROL_MIN, CONTROL_MAX);
 
-  Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, 0);
-  Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.5, .25, 0);
+  Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.0, .5, 0);
+  Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.8, .25, 0);
 
   Pid_SetIntegratorError(&pitch_rate_pid, -RATE_INTEGRATOR_MAX, RATE_INTEGRATOR_MAX);
   Pid_SetIntegratorError(&roll_rate_pid, -RATE_INTEGRATOR_MAX, RATE_INTEGRATOR_MAX);
@@ -406,15 +406,15 @@ static void CommitActuators(const FlightControlOutput_t* controls)
 {
   float actuators[SERVO_ACTUATOR_COUNT];
 
-  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT] = controls->throttle + controls->yaw;
-  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT] = controls->throttle - controls->yaw;
+  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_LEFT] = controls->throttle + (controls->yaw * .25f);
+  actuators[SERVO_ACTUATOR_OUTPUT_THROTTLE_RIGHT] = controls->throttle - (controls->yaw * .25f);
   
-  actuators[SERVO_ACTUATOR_OUTPUT_AILERON_LEFT] = controls->roll + controls->flap;
-  actuators[SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT] = -controls->roll + controls->flap;
+  actuators[SERVO_ACTUATOR_OUTPUT_AILERON_LEFT] = controls->roll;
+  actuators[SERVO_ACTUATOR_OUTPUT_AILERON_RIGHT] = -controls->roll;
   
   actuators[SERVO_ACTUATOR_OUTPUT_ELEVATOR] = controls->pitch;
   
-  actuators[SERVO_ACTUATOR_OUTPUT_PAN] = controls->yaw;
+  actuators[SERVO_ACTUATOR_OUTPUT_PAN] = -controls->yaw;
 
   ServoActuatorTranslate((float*)&actuators, (ServoActuatorTranslation_t*)&servo_accuator_translations, SERVO_ACTUATOR_COUNT);
 }
