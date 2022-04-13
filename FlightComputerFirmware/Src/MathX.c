@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <math.h>
 #include "MathX.h"
 
@@ -40,4 +41,34 @@ float MathX_MapF(const float x, const float in_min, const float in_max, const fl
 float MathX_Magnitude3DF(const float x, const float y, const float z)
 {
   return sqrt(x*x + y*y + z*z);
+}
+
+uint32_t MathX_Bin(const uint32_t x, const uint32_t* bins, const uint32_t bin_count)
+{
+  uint32_t i;
+  
+  for (i = 0; i < bin_count; i++)
+  {
+    if (x >= 0 && x < bins[i])
+    {
+      return i;
+    }
+  }
+  
+  return UINT32_MAX;
+}
+
+uint32_t MathX_BinPiecewise(const float x, const IntervalF_t* intervals, const uint32_t interval_count)
+{
+  uint32_t i;
+  
+  for (i = 0; i < interval_count; i++)
+  {
+    if (x >= intervals[i].minimum && x <= intervals[i].maximum)
+    {
+      return i;
+    }
+  }
+  
+  return UINT32_MAX;
 }

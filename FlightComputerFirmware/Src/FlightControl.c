@@ -13,6 +13,7 @@
 #include "Ticks.h"
 #include "Pid.h"
 #include "ImuAhrs.h"
+#include "Log.h"
 
 #define CONTROL_MIN -1000.0f
 #define CONTROL_MAX 1000.0f
@@ -97,9 +98,12 @@ enum RC_INPUT_CHANNEL
   RC_INPUT_CHANNEL_ARM = 4,
   RC_INPUT_CHANNEL_MODE = 5,
   RC_INPUT_CHANNEL_FLAPS = 6,
+  RC_INPUT_CHANNEL_SLIDER_1 = 7,
+  RC_INPUT_CHANNEL_MOMENTARY = 8,
+  RC_INPUT_CHANNEL_SELECT = 9,
 };
 
-#define RC_INPUT_CHANNEL_COUNT 6
+#define RC_INPUT_CHANNEL_COUNT 10
 
 enum SERVO_ACTUATOR_OUTPUT
 {
@@ -149,6 +153,9 @@ typedef struct
 
 #define FLAP_SCALER .5f
 
+static float pitch_ff_gain = 0;
+static float roll_ff_gain = 0;
+
 static enum FLIGHTCONTROL_COMMAND last_flight_control_command = FLIGHTCONTROL_COMMAND_NONE;
 
 static void ServoActuatorTranslate(const float* input, const ServoActuatorTranslation_t* translation, const uint32_t translation_count);
@@ -179,7 +186,7 @@ void FlightControl_Init(void)
   Pid_SetTuning(&pitch_attitude_pid, FLIGHTCONTROL_PERIOD, 1.9, 0, 0);
   Pid_SetTuning(&roll_attitude_pid, FLIGHTCONTROL_PERIOD, 2.0, 0, 0);
 
-  xTaskCreate(FlightControlTask, TAG, 600, NULL, 0, NULL);
+  xTaskCreate(FlightControlTask, TAG, 700, NULL, 0, NULL);
 }
 
 static void ComputeAttitude(FlightControlOutput_t* const control_outputs, const ImuAhrsStatus_t* imu_ahrs_status, const FlightControlCommandAttitude_t* command)
@@ -210,6 +217,17 @@ static void ComputeAttitude(FlightControlOutput_t* const control_outputs, const 
   control_outputs->throttle = command->throttle;
 }
 
+#define BIN_COUNT 6
+const IntervalF_t gain_select_bins[BIN_COUNT] =
+{
+  {-1000, -900}, // -976
+  {-700, -600},  // -608
+  {-300, -200},  // -208
+  {200, 300},    // -206
+  {600, 700},    // -607
+  {900, 1000}, // -976
+};
+
 static void FlightControlTask(void* arg)
 {
   CrsfStatus_t crsf_status = {0};
@@ -218,6 +236,8 @@ static void FlightControlTask(void* arg)
   uint32_t faults;
   enum FLIGHTCONTROL_MODE tx_flight_control_mode;
   FlightControlCommand_t flight_control_command;
+  uint32_t last_gain_select = 0;
+  uint32_t current_gain_select = 0;
 
   while (true)
   {
@@ -278,6 +298,62 @@ static void FlightControlTask(void* arg)
     }
     else
     {
+      current_gain_select = MathX_BinPiecewise(crsf_status.channel_data.channels[RC_INPUT_CHANNEL_SELECT], gain_select_bins, BIN_COUNT);
+      
+      if (current_gain_select != last_gain_select)
+      {
+        LOG_W(TAG, "Tuning switch: %li -> %li", last_gain_select, current_gain_select);
+        switch (current_gain_select)
+        {
+          case 0:
+            pitch_ff_gain = 0;
+            roll_ff_gain = 0;
+            Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, 0);
+            Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.5, .25, 0);
+            break;
+            
+          case 1:
+            pitch_ff_gain = 0;
+            roll_ff_gain = 0;
+            Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, 0, 0);
+            Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.5, 0, 0);
+            break;
+            
+          case 2:
+            pitch_ff_gain = 0;
+            roll_ff_gain = 0;
+            Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, .5);
+            Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.5, .25, .5);
+            break;
+            
+          case 3:
+            pitch_ff_gain = 0;
+            roll_ff_gain = 0;
+            Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, 0);
+            Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.0, .5, 0);
+            break;
+            
+          case 4:
+            pitch_ff_gain = 0;
+            roll_ff_gain = .1;
+            Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, 0);
+            Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.0, 0, 0);
+            break;
+            
+          case 5:
+            pitch_ff_gain = 0;
+            roll_ff_gain = .25;
+            Pid_SetTuning(&pitch_rate_pid, FLIGHTCONTROL_PERIOD, 2.4, .5, 0);
+            Pid_SetTuning(&roll_rate_pid, FLIGHTCONTROL_PERIOD, 1.0, 0, 0);
+            break;
+            
+          default:
+            break;
+        }
+        
+        last_gain_select = current_gain_select;
+      }
+      
       if (Bits_IsSet(faults, FLIGHTCONTROL_FAULT_IMUAHRS_INVALID))
       {
         tx_flight_control_mode = FLIGHTCONTROL_MODE_DIRECT;
@@ -336,8 +412,8 @@ static void FlightControlTask(void* arg)
       // Rate based (degrees per second)
       case FLIGHTCONTROL_COMMAND_RATE:
         control_outputs.yaw = flight_control_command.rate.yaw_rate;
-        control_outputs.pitch = Pid_Calculate(&pitch_rate_pid, flight_control_command.rate.pitch_rate, imu_ahrs_status.pitch_rate);
-        control_outputs.roll = Pid_Calculate(&roll_rate_pid, flight_control_command.rate.roll_rate, imu_ahrs_status.roll_rate);
+        control_outputs.pitch = (pitch_ff_gain * flight_control_command.rate.pitch_rate) + Pid_Calculate(&pitch_rate_pid, flight_control_command.rate.pitch_rate, imu_ahrs_status.pitch_rate);
+        control_outputs.roll = (roll_ff_gain * flight_control_command.rate.roll_rate) + Pid_Calculate(&roll_rate_pid, flight_control_command.rate.roll_rate, imu_ahrs_status.roll_rate);
         control_outputs.throttle = flight_control_command.rate.throttle;
         control_outputs.flap = flight_control_command.rate.flap * FLAP_SCALER;
         last_flight_control_command = FLIGHTCONTROL_COMMAND_RATE;

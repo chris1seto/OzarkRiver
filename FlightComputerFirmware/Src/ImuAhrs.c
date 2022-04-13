@@ -138,7 +138,7 @@ static bool Mpu6050Init()
   HAL_Delay(5);
   MPU6050_setSleepEnabled(false);
   HAL_Delay(5);
-  MPU6050_setDLPFMode(0);
+  MPU6050_setDLPFMode(3);
   HAL_Delay(5);
 
   MPU6050_setXGyroOffset(0);
