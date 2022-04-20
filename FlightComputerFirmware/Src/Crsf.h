@@ -31,8 +31,18 @@ typedef struct
 
 typedef struct
 {
+  uint32_t disposed_bytes;
+  uint32_t crcs_valid_known_packets;
+  uint32_t crcs_valid_unknown_packets;
+  uint32_t crcs_invalid;
+  uint32_t invalid_known_packet_sizes;
+} CrsfParserStatistics_t;
+
+typedef struct
+{
   CrsfChannelData_t channel_data;
   CrsfLinkStatistics_t link_statistics;
+  CrsfParserStatistics_t parser_statistics;
 } CrsfStatus_t;
 
 void Crsf_Init(void);

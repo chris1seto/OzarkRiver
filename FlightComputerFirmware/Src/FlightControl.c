@@ -167,6 +167,9 @@ static const char* TAG = "FLIGHTCONTROL";
 #define FLIGHTCONTROL_PERIOD   (10 / portTICK_PERIOD_MS)
 #define RCINPUT_TIMEOUT   (250 / portTICK_PERIOD_MS)
 
+#define CRSF_STATS_PERIOD   (1000 / portTICK_PERIOD_MS)
+static TickType_t last_crsf_stats_print = 0;
+
 void FlightControl_Init(void)
 {
   // Configure rate PID
@@ -270,6 +273,18 @@ static void FlightControlTask(void* arg)
       if (Ticks_IsExpired(crsf_status.channel_data.timestamp, RCINPUT_TIMEOUT))
       {
         Bits_Set(&faults, FLIGHTCONTROL_FAULT_RCIN_INVALID);
+      }
+      
+      if (Ticks_IsExpired(last_crsf_stats_print, CRSF_STATS_PERIOD))
+      {
+        Ticks_Reset(&last_crsf_stats_print);
+        
+        LOG_W(TAG, "disposed_bytes: %li, crcs_valid_known_packets %li, crcs_valid_unknown_packets %li, crcs_invalid %li, invalid_known_packet_sizes %li",
+          crsf_status.parser_statistics.disposed_bytes,
+          crsf_status.parser_statistics.crcs_valid_known_packets,
+          crsf_status.parser_statistics.crcs_valid_unknown_packets,
+          crsf_status.parser_statistics.crcs_invalid,
+          crsf_status.parser_statistics.invalid_known_packet_sizes);
       }
     }
 

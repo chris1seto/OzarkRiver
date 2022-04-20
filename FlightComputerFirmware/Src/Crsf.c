@@ -132,7 +132,7 @@ void Crsf_Init(void)
   serial_interface = Serial3_GetInterface();
   serial_interface->init(0, 0);
 
-  xTaskCreate(CrsfTask, TAG, 800, NULL, 0, NULL);
+  xTaskCreate(CrsfTask, TAG, 1000, NULL, 0, NULL);
 }
 
 bool Crsf_GetStatus(CrsfStatus_t* const status)
@@ -250,7 +250,12 @@ static void ParseCrsfPackets(void)
             parser_state = PARSER_STATE_SIZE_TYPE;
             working_segment_size = PACKET_SIZE_TYPE_SIZE;
             working_index = 0;
+            buffer_count = QueueBuffer_Count(serial_interface->rx_queue);
             continue;
+          }
+          else
+          {
+            crsf_status.parser_statistics.disposed_bytes++;
           }
         }
 
@@ -265,22 +270,35 @@ static void ParseCrsfPackets(void)
 
         working_descriptor = FindCrsfDescriptor(packet_type);
 
-        if (working_descriptor == NULL
-          || packet_size != working_descriptor->packet_size + PACKET_SIZE_TYPE_SIZE)
+        // If we know what this packet is...
+        if (working_descriptor != NULL)
         {
-          parser_state = PARSER_STATE_HEADER;
-          working_segment_size = HEADER_SIZE;
-          working_index = 0;
-          continue;
+          // Validate length
+          if (packet_size != working_descriptor->packet_size + PACKET_SIZE_TYPE_SIZE)
+          {
+            crsf_status.parser_statistics.invalid_known_packet_sizes++;
+            parser_state = PARSER_STATE_HEADER;
+            working_segment_size = HEADER_SIZE;
+            working_index = 0;
+            buffer_count = QueueBuffer_Count(serial_interface->rx_queue);
+            continue;
+          }
+
+          working_segment_size = working_descriptor->packet_size;
+        }
+        else
+        {
+          // We don't know what this packet is, so we'll let the parser continue
+          // just so that we can dequeue it in one shot
+          working_segment_size = packet_size + PACKET_SIZE_TYPE_SIZE;
         }
 
         parser_state = PARSER_STATE_PAYLOAD;
-        working_segment_size = working_descriptor->packet_size;
         break;
 
       // Full packet content
       case PARSER_STATE_PAYLOAD:
-        working_index += working_descriptor->packet_size;
+        working_index += working_segment_size;
         working_segment_size = CRC_SIZE;
         parser_state = PARSER_STATE_CRC;
         break;
@@ -291,13 +309,30 @@ static void ParseCrsfPackets(void)
         QueueBuffer_PeekBuffer(serial_interface->rx_queue, 0, process_buffer, working_index + CRC_SIZE);
 
         // Verify checksum
-        if (Crc8Calc(process_buffer + PACKET_SIZE_SIZE, working_descriptor->packet_size + PACKET_TYPE_SIZE) == process_buffer[working_index])
+        if (Crc8Calc(process_buffer + PACKET_SIZE_SIZE, working_index - PACKET_SIZE_SIZE) == process_buffer[working_index])
         {
-          if (working_descriptor->processor(process_buffer + PACKET_SIZE_TYPE_SIZE, working_index - PACKET_SIZE_TYPE_SIZE))
+          if (working_descriptor != NULL)
           {
-            // Remove the sucessfully processed data from the queue
-            QueueBuffer_Dequeue(serial_interface->rx_queue, working_index + CRC_SIZE);
+            if (working_descriptor->processor != NULL)
+            {
+              if (working_descriptor->processor(process_buffer + PACKET_SIZE_TYPE_SIZE, working_index - PACKET_SIZE_TYPE_SIZE))
+              {
+                crsf_status.parser_statistics.crcs_valid_known_packets++;
+              }
+            }
           }
+          else
+          {
+            // No working_descriptor at this point means unknown packet
+            crsf_status.parser_statistics.crcs_valid_unknown_packets++;
+          }
+
+          // Remove the sucessfully processed data from the queue
+          QueueBuffer_Dequeue(serial_interface->rx_queue, working_index + CRC_SIZE);
+        }
+        else
+        {
+          crsf_status.parser_statistics.crcs_invalid++;
         }
 
         working_index = 0;
@@ -312,7 +347,7 @@ static void ParseCrsfPackets(void)
 
 static void Crc8Init(const uint8_t poly)
 {
-  for (int idx=0; idx < 256; ++idx)
+  for (int idx = 0; idx < 256; ++idx)
   {
     uint8_t crc = idx;
     for (int shift = 0; shift<8; ++shift)
